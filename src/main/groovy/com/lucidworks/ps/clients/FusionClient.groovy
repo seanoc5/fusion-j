@@ -8,31 +8,31 @@ import org.apache.log4j.Logger
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.nio.file.Path
 import java.time.Duration
 
 /**
  * attempt to replicate solrj client-ness for fusion
  * using cookies and session api to start with
+ * this client will 'remember' the base fusion connection info (base url, user/pass,...) and allow flexibility among apps, collections, pipelines...
+ *
  * sample rest calls: http://localhost:8764/api
  * POST http://localhost:8764/api/session
  * GET  http://localhost:8764/api/apps/${app}/query-pipelines/$qryp/collections/$coll/select?q=spark
  * POST http://localhost:8764/api/index-pipelines/$idxp/collections/$coll/index?commit=true
  *
  * todo beef up wt support, assuming json for everything at the moment...
- *
+ * todo handle f4 vs f5 (and managed fusion?) differences
+ * todo consider httpclient cache for peformance and multithreading
+ * todo add parallelism and scaling for bulk data transfers
  */
 class FusionClient {
-    protected static Logger log = Logger.getLogger(this.class.name);
-    String host
-    Integer port
+    protected static Logger log = Logger.getLogger(this.class.name)
     String user
     String password
-    String application
-    String collection
 
-    /** e.g. http://localhost:8764/api */
     String fusionBase
-    HttpClient httpFusionClient
+    HttpClient httpClient
     private String sessionCookie
     Map introspectInfo
     Map apiInfo
@@ -40,60 +40,32 @@ class FusionClient {
     long MAX_COOKIE_AGE_MS = 1000 * 60 * 15
     // starting with default of 15 minutes for cookie age?      // todo -- revisit, make this more accessible
 
-    FusionClient(String baseUrl, Integer port, String user, String pass, String app, String coll) {
-//        this.host = host
+    FusionClient(URL baseUrl, String user, String pass) {
         this.fusionBase = baseUrl
-        this.port = port
         this.user = user
         this.password = pass
-        this.application = app
-        this.collection = coll
 
-        if (baseUrl.endsWith('/')) {
-            log.info "\tstripping trailing slash from host: '$host' to build base with a leading slash..."
-            host = host[0..-2]
+        String s = baseUrl.toString()
+        if (s.endsWith('/')) {
+            this.fusionBase = new URL(s[0..-2])
+            log.warn "\tstripping trailing slash from baseUrl: '$s' => "
         }
-        if (port) {
-            fusionBase = "${baseUrl}:${port}/api"
-            log.info "\tPort: $port:: fusion base: $fusionBase"
-        } else {
-            fusionBase = "${baseUrl}/api"
-            log.info "\tNo Port:: fusion base: $fusionBase"
-        }
-        log.debug "constructor: $baseUrl, $port, $user, $pass, $app, $coll, calling buildClient..."
-        httpFusionClient = buildClient(fusionBase, user, password)
-//        introspectInfo = getFusionInformation()
+        log.debug "constructor: $baseUrl, $user, $pass :: calling buildClient..."
+        httpClient = buildClient(fusionBase, user, password)
     }
 
-    /**
-     * map based constructor
-     * todo -- find good-practice for how to do this with mandatory and optional params, sanity checks, etc
-     * @param params
-     */
-    FusionClient(Map<String, Object> params){
-        this.host = params.host
-        this.port = params.port
-        this.user = params.user
-        this.password =params.password ?: params.pass
-        this.application = params.app ?: params.application
-        this.collection = params.coll ?: params.collection
-        fusionBase = "${host}${port ? ":" + port : ''}/api"
-
-        httpFusionClient = buildClient(fusionBase, user, password)
-        log.info "Map based constructor got base urL:'$fusionBase' from map: $params"
-    }
-
-    public HttpClient buildClient() {
+/*
+    HttpClient buildClient() {
         if (isValidFusionClient()) {
-            return httpFusionClient
+            return httpClient
         } else {
             log.info "\tFusion client not valid, trying to get a valid version now (first call, or timeout...?)..."
             log.debug "\t${this.class.name} getClient() using contructor set vars(baseurl: $fusionBase, user:$user, password <hidden>...)   [should only need to call this once...]"
-            httpFusionClient = buildClient(fusionBase, user, password)
-            return httpFusionClient
+            httpClient = buildClient(fusionBase, user, password)
+            return httpClient
         }
     }
-
+*/
 
 /**
  * Get a JDK HttpClient with some defaults set for convenience
@@ -102,17 +74,17 @@ class FusionClient {
  * @param pass
  * @return
  */
-    public HttpClient buildClient(String baseUrl, String user, String pass) {
+    HttpClient buildClient(String baseUrl, String user, String pass) {
         log.info "\t${this.class.simpleName} getClient(baseurl: $baseUrl, user:$user, password <hidden>...)   [should only need to call this once...]"
         HttpClient client = HttpClient.newBuilder()
                 .cookieHandler(new CookieManager())
                 .version(HttpClient.Version.HTTP_1_1)
-                .build();
+                .build()
 
         // groovy string template for speed, rather than json builder
         String authJson = """{"username":"$user", "password":"$pass"}"""
 
-        String urlSession = "${baseUrl}/session"
+        String urlSession = "${baseUrl}/api/session"
         log.info "\tInitializing Fusion client session via POST to session url: $urlSession"
 
         try {
@@ -121,15 +93,15 @@ class FusionClient {
                     .timeout(Duration.ofMinutes(2))
                     .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
                     .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(authJson))        // redundant with client.send below? no?? this adds the payload, BodyHandlers.ofString below builds the request string?
-                    .build();
+                    .POST(HttpRequest.BodyPublishers.ofString(authJson))        // redundant with client.send below? no?? this adds the payload, BodyHandlers.ofString below builds the request string? no?? receives the response??
+                    .build()
 
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            log.debug("\t\tResponse status: " + response.statusCode());
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString())
+            log.debug("\t\tResponse status: " + response.statusCode())
             sessionCookie = response.headers().firstValue("set-cookie")
             cookieMS = System.currentTimeMillis()
             Date ts = new Date(cookieMS)
-            log.info("\tSession cookie: ${this.sessionCookie} set/refreshed at timestamp: $cookieMS (${ts})");
+            log.info("\tSession cookie: ${this.sessionCookie} set/refreshed at timestamp: $cookieMS (${ts})")
 
         } catch (Exception e) {
             log.warn "Problem getting client: $e"
@@ -141,45 +113,72 @@ class FusionClient {
 
 
     /**
+     * setup method to establish creditials provider for Fusion auth (basic realm now, more to come...)
+     * @param hostname
+     * @param port
+     * @param protocol
+     * @param user
+     * @param pass
+     * @return
+     */
+/*
+    def buildCredentialsProvider(String hostname, int port, String protocol, String user, String pass) {
+        credentialsProvider = new BasicCredentialsProvider()
+        HttpHost targetHost = new HttpHost(hostname, port, protocol)
+        credentialsProvider.setCredentials(
+                new AuthScope(targetHost.getHostName(), targetHost.getPort()),
+                new UsernamePasswordCredentials(user, pass)
+        )
+
+        AuthCache authCache = new BasicAuthCache()     // Create AuthCache instance
+        BasicScheme basicAuth = new BasicScheme()
+        // Generate BASIC scheme object and add it to the local auth cache
+        authCache.put(targetHost, basicAuth)
+        log.info "Initialized credentialsProvider: $credentialsProvider"
+    }
+*/
+
+
+    /**
      * trying to get general information, primarily fusion version, so we can adjust api syntax accordingly
      *
      * @return
      */
     def getFusionInformation() {
         var reqApi = HttpRequest.newBuilder()
-                .uri(URI.create("${this.fusionBase}"))
+                .uri(URI.create("${this.fusionBase}/api"))
                 .GET()
                 .timeout(Duration.ofMinutes(2))
                 .setHeader("User-Agent", "Java 11+ HttpClient FusionPS Bot") // add request header
 //                .header("Content-Type", "application/json")
-                .build();
+                .build()
 
         JsonSlurper jsonSlurper = new JsonSlurper()
 
-        HttpResponse<String> response = httpFusionClient.send(reqApi, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = httpClient.send(reqApi, HttpResponse.BodyHandlers.ofString())
         int rc = response.statusCode()
         if (rc >= 200 && rc < 300) {
-            log.debug("Response from getFusionInformation() ${response.statusCode()}");
+            log.debug("Response from getFusionInformation() ${response.statusCode()}")
             apiInfo = jsonSlurper.parseText(response.body())
             log.debug "Fusion API info: $apiInfo"
         } else {
             log.warn "Could not get valid API information: ${this.fusionBase}"
         }
 
-        URI uri = (URI.create("${this.fusionBase}/introspect"))
+        URI uri = (URI.create("${this.fusionBase}/api/introspect"))
         var reqIntro = HttpRequest.newBuilder()
                 .GET()
                 .uri(uri)
                 .timeout(Duration.ofMinutes(2))
                 .setHeader("User-Agent", "Java 11+ HttpClient FusionPS Bot") // add request header
 //                .header("Content-Type", "application/json")
-                .build();
+                .build()
 
-        HttpResponse<String> respIntro = httpFusionClient.send(reqApi, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> respIntro = httpClient.send(reqApi, HttpResponse.BodyHandlers.ofString())
         rc = respIntro.statusCode()
         if (rc >= 200 && rc < 300) {
 
-            log.debug("Response introspection result code: ${respIntro.statusCode()}");
+            log.debug("Response introspection result code: ${respIntro.statusCode()}")
             introspectInfo = jsonSlurper.parseText(response.body())
             log.debug "\tFusion Introspection info: $introspectInfo"
         } else {
@@ -192,57 +191,43 @@ class FusionClient {
     /**
      * get fusion version, likely part of setting the rest api structure in future calls
      */
-    def getFusionVersion() {
-        // todo :: figure out what is a good way to get relevant version info, the calls in getFusionVersion don't have what I expect (version is 'local' for localhost 4.2.6)
-        return "more to come RSN..."
-    }
+//    def getFusionVersion() {
+//        // todo :: figure out what is a good way to get relevant version info, the calls in getFusionVersion don't have what I expect (version is 'local' for localhost 4.2.6)
+//        return "more to come RSN..."
+//    }
 
 
     /**
      * execute 'basic query'
      * e.g. https://radar.lucidworks.com/api/apps/Lucy/query-pipelines/lucy-basic-qryp/collections/Lucy/select?echoParams=all&wt=json&json.nl=arrarr&debug=timing&debug=query&debug=results&fl=score,*&sort&start=0&q=Joti dhillon (csm "customer success")&rows=10
      */
-    def query(String baseUrl, String app, String coll, String qryp, Map<String, Object> qparams, String reqHandler = 'select') {
+    def query(String app, String collection, String queryPipeline, Map<String, Object> qparams = [:], String reqHandler = 'select') {
 
-        URIBuilder ub = new URIBuilder("${baseUrl}/apps/${app}/query-pipelines/${qryp}/collections/${coll}/${reqHandler}");
+        URIBuilder ub = new URIBuilder("${this.fusionBase}/api/apps/${app}/query-pipelines/${queryPipeline}/collections/${collection}/${reqHandler}")
+//        URI uri = URI.create("${this.fusionBase}/api/apps/${app}/query-pipelines/${queryPipeline}/collections/${collection}/${reqHandler}")
         qparams.each { String name, def val ->
             log.debug "\t\t Adding param: $name => $val"
-            ub.addParameter(name, "${val}")         // needs to be a string?
+            uriaddParameter(name, "${val}")         // needs to be a string?
         }
         URI uri = URI.create(ub.toString())
-        log.debug "\t\tprepared uri: $uri"
+        log.info "\t\tprepared uri: $uri"
 
         var request = HttpRequest.newBuilder()
                 .GET()
                 .uri(uri)
-                .build();
+                .build()
 
-        // todo -- any difference if we do not use String type/generic?
-        HttpResponse<String> queryResponse = httpFusionClient.send(request, HttpResponse.BodyHandlers.ofString());
-        log.debug "Query response: $queryResponse"
+        HttpResponse<String> queryResponse = null
+        try {
+            // todo -- any difference if we do not use String type/generic?
+            queryResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+            log.info "Query response: $queryResponse"
+        } catch (ConnectException ce) {
+            log.info "Connection error...? $ce"
+        }
         return queryResponse
     }
 
-
-    HttpResponse query(String qryPipeline, Map<String, Object> qparams) {
-        log.info "\tQuery with params: $qparams"
-        HttpResponse r = this.query(fusionBase, application, collection, qryPipeline, qparams)
-        return r
-    }
-
-    HttpResponse query(String qryPipeline, String q) {
-        Map qparams = [q: q]
-        HttpResponse r = this.query(fusionBase, application, collection, qryPipeline, qparams)
-        return r
-    }
-
-    HttpResponse query(String q) {
-        Map qparams = [q: q]
-        String qryp = collection
-        log.info "\t\t defaulting to querypipeline same name as collection: $qryp..."
-        HttpResponse r = this.query(fusionBase, application, collection, qryp, qparams)
-        return r
-    }
 
     /**
      * helper function to standardize/streamline? code for parsing & handling query response
@@ -257,7 +242,7 @@ class FusionClient {
         return docs
     }
 
-    Map<String, Object> parseResponse(HttpResponse response){
+    Map<String, Object> parseResponse(HttpResponse response) {
         String respStr = response.body()
         //todo -- parse other formats (xml...)
 //        def headers = res
@@ -272,13 +257,28 @@ class FusionClient {
      * default commit=false, allow solr autocommit to work it's magic
      * @return
      */
-    HttpResponse indexContent(List<Map<String, Object>> docs, String idxp = '', String coll = '', boolean commit = false) {
+    HttpResponse indexContentByCollectionPipeline(String collection, String indexPipeline, List<Map<String, Object>> docs, boolean commit) {
         String jsonToIndex = new JsonBuilder(docs).toString()
 
-        HttpResponse<String> indexResponse = indexContent(jsonToIndex, coll, idxp, commit)
+        HttpResponse<String> indexResponse = indexContent(collection, indexPipeline, jsonToIndex, commit)
+        return indexResponse
+    }
+
+    /**
+     * post content (Map) to fusion index profile
+     * e.g. api/index-pipelines/{{idxp}}/collections/{{coll}}/index?commit=false
+     * default commit=false, allow solr autocommit to work it's magic
+     * @return
+     */
+/*
+    HttpResponse indexDocumentsByApplicationProfile(String application, String indexProfile, List<Map<String, Object>> docs, boolean commit) {
+        String jsonToIndex = new JsonBuilder(docs).toString()
+
+        HttpResponse<String> indexResponse = indexDocumentsByApplicationProfile(application, indexProfile, jsonToIndex, commit)
         //if(indexResponse.resp
         return indexResponse
     }
+*/
 
 
     /**
@@ -287,20 +287,10 @@ class FusionClient {
      * default commit=false, allow solr autocommit to work it's magic
      * @return
      */
-    HttpResponse indexContent(String jsonToIndex, String idxp = '', String coll = '', boolean commit = false) {
+    HttpResponse indexContent(String collection, String indexPipeline, String jsonToIndex, boolean commit) {
         HttpResponse<String> indexResponse = null
-
-        if (!coll) {
-            log.info "\t indexContent: defaulting collection to app:$application..."
-            coll = application
-        }
-        if (!idxp) {
-            log.info "\t idnexContent: defaulting index pipeline to collection name: $coll"
-            idxp = coll
-        }
-
         try {
-            String url = "$fusionBase/index-pipelines/${idxp}/collections/${coll}/index?commit=${commit}"
+            String url = "$fusionBase/api/index-pipelines/${indexPipeline}/collections/${collection}/index?commit=${commit}"
             if (log.isDebugEnabled()) {
                 log.debug "\t indexContent url: $url -- Json:\t $jsonToIndex"
             } else {
@@ -310,11 +300,11 @@ class FusionClient {
                     .uri(URI.create(url))
                     .timeout(Duration.ofMinutes(1))
                     .header("Content-Type", "application/json")
-            // .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
+                    .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
                     .POST(HttpRequest.BodyPublishers.ofString(jsonToIndex))
-                    .build();
+                    .build()
 
-            indexResponse = httpFusionClient.send(indexRequest, HttpResponse.BodyHandlers.ofString());
+            indexResponse = httpClient.send(indexRequest, HttpResponse.BodyHandlers.ofString())
             int statusCode = indexResponse.statusCode()
             if (isSuccessResponse(indexResponse)) {
                 log.info("\t\t Index response: ${indexResponse.statusCode()}")
@@ -330,10 +320,65 @@ class FusionClient {
         return indexResponse
     }
 
+    HttpResponse indexContentByProfile(Collection collToIndex, String app, String idxprofile, boolean commit) {
+        String jsonToIndex = new JsonBuilder(collToIndex).toString()
+        indexContentByProfile(jsonToIndex, app, idxprofile, commit)
+    }
+
+    /**
+     * post content (Map) to fusion index profile
+     * e.g. http://34.82.69.71:6764/api/apps/Lucy/index/upval-json
+     * default commit=false, allow solr autocommit to work it's magic
+     * @return
+     */
+    HttpResponse indexContentByProfile(String jsonToIndex, String app, String idxprofile, boolean commit) {
+        HttpResponse<String> indexResponse = null
+        try {
+            JsonSlurper jsonSlurper = new JsonSlurper()
+
+            // todo -- revisit base url... constructor includes '/api' by default... is this wise?
+            String url = "$fusionBase/api/apps/${app}/index/$idxprofile?commit=${commit}"
+            log.debug "\t indexContent url: $url -- Json:\t $jsonToIndex"
+            long start = System.currentTimeMillis()
+
+            var indexRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofMinutes(1))
+                    .header("Content-Type", "application/json")
+                    .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonToIndex))
+                    .build()
+            long end = System.currentTimeMillis()
+            long elapsed = end - start
+            log.debug "\t\tElapsed time1: ${elapsed}ms (${elapsed / 1000} sec) -- build HttpRequest to post/index content"
+
+            indexResponse = httpClient.send(indexRequest, HttpResponse.BodyHandlers.ofString())
+
+            end = System.currentTimeMillis()
+            elapsed = end - start
+            log.info "\t\tElapsed time: ${elapsed}ms (${elapsed / 1000} sec) - to actually index content"
+
+            int statusCode = indexResponse.statusCode()
+            String body = indexResponse.body()
+            Map bodyMap = jsonSlurper.parseText(body)
+            if (isSuccessResponse(indexResponse)) {
+                log.debug("\t\tIndex response: ${indexResponse.statusCode()}")
+                log.debug "\t\tBody response map: $bodyMap"
+            } else {
+                log.warn "Response shows unsuccessful? Status code: $statusCode -- ${body}"
+            }
+
+        } catch (IllegalArgumentException iae) {
+            log.error "IllegalArgumentException: $iae"
+        }
+
+        return indexResponse
+    }
+
 
     boolean isValidFusionClient() {
         boolean valid = false
-        if (httpFusionClient && sessionCookie && cookieMS) {
+        if (httpClient && sessionCookie && cookieMS) {
             long nowMS = System.currentTimeMillis()
             long cookieAgeMS = (nowMS - cookieMS)
             if (cookieAgeMS > MAX_COOKIE_AGE_MS) {
@@ -343,34 +388,34 @@ class FusionClient {
             log.debug "\tFusion client seems valid, and we have a session cookie"
             valid = true
         } else {
-            log.info "fusionClient($httpFusionClient) is not valid/current:: sessionCookie:$sessionCookie -- cookieMS:$cookieMS"
+            log.info "fusionClient($httpClient) is not valid/current:: sessionCookie:$sessionCookie -- cookieMS:$cookieMS"
             valid = false
         }
         return valid
     }
 
-    boolean isSuccessResponse(HttpResponse<String> response) {
+    boolean isSuccessResponse(HttpResponse response) {
         int statusCode = response.statusCode()
         if (statusCode >= 200 && statusCode < 300) {
             log.debug "\t\tSuccessful request/response, code: $statusCode"
             return true
         } else {
-            if (response.body()) {
-                JsonSlurper jsonSlurper = new JsonSlurper()
-                Map jsonBody = jsonSlurper.parseText(response.body())
-                def lwStacks = jsonBody?.cause?.stackTrace?.findAll { cn ->
-                    !(cn.className =~ /google|jetty|jvnet|sun|glassfish|reflect/)
-                }
-
-                log.warn "\t\t Failure?? request/response code: $statusCode. Response details: ${jsonBody.details}\n${lwStacks?.join('\n')}"
-            } else {
-                log.warn "\\t\\t Failure?? request/response code: $statusCode. Response: ${response}"
-            }
+//            if (response response.body()) {
+//                JsonSlurper jsonSlurper = new JsonSlurper()
+//                Map jsonBody = jsonSlurper.parseText(response.body())
+//                def lwStacks = jsonBody?.cause?.stackTrace?.findAll { cn ->
+//                    !(cn.className =~ /google|jetty|jvnet|sun|glassfish|reflect/)
+//                }
+//
+//                log.warn "\t\t Failure?? request/response code: $statusCode. Response details: ${jsonBody.details}\n${lwStacks?.join('\n')}"
+//            } else {
+            log.warn "\\t\\t Failure?? request/response code: $statusCode. Response: ${response}"
+//            }
             return false
         }
     }
 
-    def useLuke(){
+    def useLuke() {
 //        oldmac:8764/api/solr/lucy/admin/luke
         //        def rsp = query(fusionBase, application, collection, )
 //                URIBuilder ub = new URIBuilder("${baseUrl}/api/solr/$collection/");
@@ -397,11 +442,12 @@ class FusionClient {
     /**
      * get all the terms for the current collection
      */
-    HttpResponse getTermsResponse(String field, int limitCount=1000000, String regex = '[a-z]+'){
+/*
+    HttpResponse getTermsResponse(String collection, String field, int limitCount = 1000000, String regex = '[a-z]+') {
 //        def rsp = query(fusionBase, application, collection, )
 //        URIBuilder ub = new URIBuilder("${fusionBase}/solr/$collection/terms?terms.fl=${field}");
 //        URIBuilder ub = new URIBuilder("${fusionBase}/solr/$collection/terms?terms.fl=${field}&terms.limit=$limitCount&terms.regex=$regex");
-        URIBuilder ub = new URIBuilder("${fusionBase}/solr/$collection/terms")
+        URIBuilder ub = new URIBuilder("${fusionBase}/api/solr/$this.collection/terms")
                 .addParameter('terms.fl', field)
                 .addParameter('terms.limit', "$limitCount")
                 .addParameter('terms.regex', regex)
@@ -418,8 +464,9 @@ class FusionClient {
         log.debug "Query response: $queryResponse"
         return queryResponse
     }
+*/
 
-    Map<String, Integer> parseTermsResponse(HttpResponse rsp){
+    Map<String, Integer> parseTermsResponse(HttpResponse rsp) {
         Map responseMap = parseResponse(rsp)
         def fieldList = responseMap.terms.keySet()
         Map<String, Map<String, Integer>> fieldsTermsMap = [:]
@@ -428,10 +475,10 @@ class FusionClient {
             List termsAndCounts = responseMap.terms[field]
 
             for (int i = 0; i < termsAndCounts.size() / 2; i++) {
-                String term = termsAndCounts[i*2]
-                int count = termsAndCounts[(i*2) + 1]
+                String term = termsAndCounts[i * 2]
+                int count = termsAndCounts[(i * 2) + 1]
                 termsMap[term] = count
-                if(i % 1000 == 0) {
+                if (i % 1000 == 0) {
                     log.info "$i) term: $term "
                 }
             }
@@ -441,25 +488,25 @@ class FusionClient {
     }
 
 
-    HttpResponse deleteByQuery(String deleteQuery, boolean commit = false) {
-        Map json = [delete: [query: deleteQuery]]
-        JsonBuilder jsonBuilder = new JsonBuilder(json)
-        String js = jsonBuilder.toString()
+    HttpResponse deleteByQuery(String collection, String deleteQuery, boolean commit = false) {
+        Map delCommand = [delete: [query: deleteQuery]]
+        JsonBuilder jsonBuilder = new JsonBuilder(delCommand)
+        String jsonString = jsonBuilder.toString()
         HttpResponse response = null
         try {
-            String url = "$fusionBase/solr/$collection/update?commit=${commit}"
-            log.info "\t Delete Content (solr) url: $url -- js body: $js"
+            String url = "$fusionBase/api/solr/$collection/update?commit=${commit}"
+            log.info "\t\tDelete Content (solr) url: $url -- json delete command: $jsonString"
             var request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .timeout(Duration.ofMinutes(1))
                     .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(js))
-                    .build();
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonString))
+                    .build()
 
-            response = httpFusionClient.send(request, HttpResponse.BodyHandlers.ofString());
+            response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
             int statusCode = response.statusCode()
             if (isSuccessResponse(response)) {
-                log.info("\t\t Index response: ${response.statusCode()}")
+                log.info("\t\t Delete by query response: ${response.statusCode()}")
             } else {
                 log.warn "Response shows unsuccessful? Status code: $statusCode -- $response"
             }
@@ -469,5 +516,60 @@ class FusionClient {
         }
 
         return response
+    }
+
+
+    HttpResponse<Path> exportFusionObjects(String exportParams, Path outputPath) {
+        String url = "$fusionBase/api/objects/export?${exportParams}"
+        log.info "\t\tExport Fusion objects url: $url"
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofMinutes(5))
+                .header("Content-Type", "application/json")
+                .GET()
+                .build()
+        HttpResponse<Path> fileResponse = null
+        try {
+            fileResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofFile(outputPath))
+
+            int statusCode = fileResponse.statusCode()
+            if (isSuccessResponse(fileResponse)) {
+                log.info "Output file: ${fileResponse} --> ${outputPath.toAbsolutePath()} \t response: ${fileResponse.statusCode()}"
+            } else {
+                log.warn "Response shows unsuccessful? Status code: $statusCode -- $fileResponse"
+            }
+        } catch (Exception e) {
+            log.error "Export exception: $e"
+        }
+        return fileResponse
+    }
+
+    def getApplications() {
+        HttpResponse response = null
+        String url = "$fusionBase/api/apps"
+        log.info "\t\tExport Fusion applications url: $url"
+        def json = null
+        var request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofMinutes(1))
+                .header("Content-Type", "application/json")
+                .GET()
+                .build()
+        try {
+            response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+            int statusCode = response.statusCode()
+            if (isSuccessResponse(response)) {
+                log.info("\t\t Get Applications response: ${response.statusCode()}")
+            } else {
+                log.warn "Response shows unsuccessful? Status code: $statusCode -- $response"
+            }
+            JsonSlurper jsonSlurper = new JsonSlurper()
+            json = jsonSlurper.parseText(response.body())
+            log.debug "Json parsed: $json"
+        } catch (Exception e) {
+            log.error "Export exception: $e"
+        }
+
+        return json
     }
 }
