@@ -40,6 +40,11 @@ class FusionClient {
     long MAX_COOKIE_AGE_MS = 1000 * 60 * 15
     // starting with default of 15 minutes for cookie age?      // todo -- revisit, make this more accessible
 
+    FusionClient(String baseUrl, String user, String pass) {
+        this(new URL(baseUrl), user, pass)
+    }
+
+
     FusionClient(URL baseUrl, String user, String pass) {
         this.fusionBase = baseUrl
         this.user = user
@@ -400,17 +405,24 @@ class FusionClient {
             log.debug "\t\tSuccessful request/response, code: $statusCode"
             return true
         } else {
-//            if (response response.body()) {
-//                JsonSlurper jsonSlurper = new JsonSlurper()
-//                Map jsonBody = jsonSlurper.parseText(response.body())
+            if (response.body()) {
+                JsonSlurper jsonSlurper = new JsonSlurper()
+                Map jsonBody = jsonSlurper.parseText(response.body())
 //                def lwStacks = jsonBody?.cause?.stackTrace?.findAll { cn ->
 //                    !(cn.className =~ /google|jetty|jvnet|sun|glassfish|reflect/)
 //                }
-//
 //                log.warn "\t\t Failure?? request/response code: $statusCode. Response details: ${jsonBody.details}\n${lwStacks?.join('\n')}"
-//            } else {
-            log.warn "\\t\\t Failure?? request/response code: $statusCode. Response: ${response}"
-//            }
+                String msg = jsonBody.message
+                String details = jsonBody.details
+
+                log.warn "(code: $statusCode) Failed call, message:[$msg] \n\t\t details: $details"
+                String causeMessage = jsonBody?.cause?.message
+                if (causeMessage) {
+                    log.warn "\t\tCause message: $causeMessage"
+                }
+            } else {
+                log.warn "Failure?? request/response code: $statusCode. Response: ${response} -- ${response.body()}"
+            }
             return false
         }
     }
@@ -519,31 +531,10 @@ class FusionClient {
     }
 
 
-    HttpResponse<Path> exportFusionObjects(String exportParams, Path outputPath) {
-        String url = "$fusionBase/api/objects/export?${exportParams}"
-        log.info "\t\tExport Fusion objects url: $url"
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofMinutes(5))
-                .header("Content-Type", "application/json")
-                .GET()
-                .build()
-        HttpResponse<Path> fileResponse = null
-        try {
-            fileResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofFile(outputPath))
-
-            int statusCode = fileResponse.statusCode()
-            if (isSuccessResponse(fileResponse)) {
-                log.info "Output file: ${fileResponse} --> ${outputPath.toAbsolutePath()} \t response: ${fileResponse.statusCode()}"
-            } else {
-                log.warn "Response shows unsuccessful? Status code: $statusCode -- $fileResponse"
-            }
-        } catch (Exception e) {
-            log.error "Export exception: $e"
-        }
-        return fileResponse
-    }
-
+    /**
+     * Get json "list" of applications defined in the cluster. See also: export
+     * @return
+     */
     def getApplications() {
         HttpResponse response = null
         String url = "$fusionBase/api/apps"
@@ -571,5 +562,342 @@ class FusionClient {
         }
 
         return json
+    }
+
+
+    HttpResponse<Path> exportFusionObjects(String exportParams, Path outputPath) {
+        String url = "$fusionBase/api/objects/export?${exportParams}"
+        log.info "\t\tExport Fusion objects url: $url"
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofMinutes(5))
+                .header("Content-Type", "application/json")
+                .GET()
+                .build()
+        HttpResponse<Path> fileResponse = null
+        try {
+            fileResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofFile(outputPath))
+
+            int statusCode = fileResponse.statusCode()
+            if (isSuccessResponse(fileResponse)) {
+                log.info "\t\tOutput file: ${fileResponse} --> ${outputPath.toAbsolutePath()} \t response: ${fileResponse.statusCode()}"
+            } else {
+                log.warn "Response shows unsuccessful? Status code: $statusCode -- $fileResponse"
+            }
+        } catch (Exception e) {
+            log.error "Export exception: $e"
+        }
+        return fileResponse
+    }
+
+
+    def createApplication(Map properties) {
+        String jsonProps = new JsonBuilder(properties)
+
+    }
+
+
+    /**
+     *
+     * @param collection
+     * @param appName
+     * @param defaultFeatures (set to false, since user is likely to create an app, which would have primary coll with default features) --here we assume supporting collections
+     * @return
+     */
+    def createCollection(Map<String, Object> collection, String appName, boolean defaultFeatures = false) {
+        HttpResponse<String> collectionResponse = null
+        String collName = collection.id
+        JsonBuilder jsonBuilder = new JsonBuilder([id: collName])
+        String jsonToIndex = jsonBuilder.toString()
+        try {
+            String url = "$fusionBase/api/apps/${appName}/collections"
+            log.info "\t Create COLLECTION ($collName) url: $url -- Json text size::\t ${jsonToIndex.size()}"
+            var collectionRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofMinutes(1))
+                    .header("Content-Type", "application/json")
+                    .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonToIndex))
+                    .build()
+
+            collectionResponse = httpClient.send(collectionRequest, HttpResponse.BodyHandlers.ofString())
+            int statusCode = collectionResponse.statusCode()
+            if (isSuccessResponse(collectionResponse)) {
+                log.info("\t\t Create coll response: ${collectionResponse.statusCode()}")
+            } else {
+                String body = collectionResponse.body()
+                log.warn "Response shows unsuccessful? Status code: $statusCode -- ${body}"
+            }
+
+        } catch (IllegalArgumentException iae) {
+            log.error "IllegalArgumentException: $iae"
+        }
+
+        return collectionResponse
+    }
+
+    List<Map> getCollections(String appName) {
+        HttpResponse<String> collectionResponse = null
+        String url = "$fusionBase/api/apps/${appName}/collections"
+        log.info "\t list collections for app $appName url: $url "
+        var collectionRequest = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofMinutes(1))
+                .header("Content-Type", "application/json")
+                .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
+                .GET()
+                .build()
+
+        collectionResponse = httpClient.send(collectionRequest, HttpResponse.BodyHandlers.ofString())
+        int statusCode = collectionResponse.statusCode()
+        String body = collectionResponse.body()
+        def collectionInfo = null
+        if (isSuccessResponse(collectionResponse)) {
+            collectionInfo = new JsonSlurper().parseText(body)
+            log.info("\t\t Create coll response: ${collectionResponse.statusCode()}")
+        } else {
+            log.warn "Response shows unsuccessful? Status code: $statusCode -- ${body}"
+        }
+
+        return collectionInfo
+    }
+
+    List getParsers(String appName) {
+        HttpResponse<String> response = null
+        String url = "$fusionBase/api/parsers"
+        log.info "\t list parsers for url: $url "
+        var collectionRequest = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofMinutes(1))
+                .header("Content-Type", "application/json")
+                .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
+                .GET()
+                .build()
+
+        response = httpClient.send(collectionRequest, HttpResponse.BodyHandlers.ofString())
+        int statusCode = response.statusCode()
+        String body = response.body()
+        def info = null
+        if (isSuccessResponse(response)) {
+            info = new JsonSlurper().parseText(body)
+            log.info("\t\t get parser response: ${response.statusCode()}")
+        } else {
+            log.warn "Response shows unsuccessful? Status code: $statusCode -- ${body}"
+        }
+
+        return info
+    }
+
+    def createParser(Map<String, Object> map, String app) {
+        HttpResponse<String> response = null
+        JsonBuilder jsonBuilder = new JsonBuilder(map)
+        String name = map.id
+        String jsonToIndex = jsonBuilder.toString()
+        try {
+            String url = "$fusionBase/api/apps/${app}/parsers"
+            log.info "\t Create PARSER ($name) url: $url -- Json text size::\t ${jsonToIndex.size()}"
+            var request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofMinutes(1))
+                    .header("Content-Type", "application/json")
+                    .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonToIndex))
+                    .build()
+
+            response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+            int statusCode = response.statusCode()
+            if (isSuccessResponse(response)) {
+                log.info("\t\t Create PARSER response($name): ${response.statusCode()}")
+            } else {
+                String body = response.body()
+                log.warn "Failed to create parser: $name? Status code: $statusCode -- ${body}"
+            }
+
+        } catch (IllegalArgumentException iae) {
+            log.error "IllegalArgumentException creating parser($name): $iae"
+        }
+
+        return response
+    }
+
+    Object getIndexPipelines(String app) {
+        HttpResponse<String> response = null
+        String url = null
+        if (app) {
+            url = "$fusionBase/api/apps/${app}/index-pipelines"
+        } else {
+            url = "$fusionBase/api/index-pipelines"
+            log.info "No app given, getting all index pipelines..."
+        }
+        log.info "\t list idx pipelines for url: $url "
+        var collectionRequest = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofMinutes(1))
+                .header("Content-Type", "application/json")
+                .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
+                .GET()
+                .build()
+
+        response = httpClient.send(collectionRequest, HttpResponse.BodyHandlers.ofString())
+        int statusCode = response.statusCode()
+        String body = response.body()
+        def info = null
+        if (isSuccessResponse(response)) {
+            info = new JsonSlurper().parseText(body)
+            log.info("\t\t get idx pipelines response for app: $app: ${response.statusCode()}")
+        } else {
+            log.warn "Failed to get idx pipelines for app: $app? Status code: $statusCode -- ${body}"
+        }
+
+        return info
+    }
+
+    def createIndexPipeline(Map<String, Object> map, String app) {
+        HttpResponse<String> response = null
+        JsonBuilder jsonBuilder = new JsonBuilder(map)
+        String name = map.id
+        String jsonToIndex = jsonBuilder.toString()
+        try {
+            String url = "$fusionBase/api/apps/${app}/index-pipelines"
+            log.info "\t Create INDEX PIPELINE ($name) url: $url -- Json text size::\t ${jsonToIndex.size()}"
+            var request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofMinutes(1))
+                    .header("Content-Type", "application/json")
+                    .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonToIndex))
+                    .build()
+
+            response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+            int statusCode = response.statusCode()
+            if (isSuccessResponse(response)) {
+                log.info("\t\t Create INDEX PIPELINE response($name): ${response.statusCode()}")
+            } else {
+                String body = response.body()
+                log.warn "Failed to create INDEX PIPELINE: $name? Status code: $statusCode -- ${body}"
+            }
+
+        } catch (IllegalArgumentException iae) {
+            log.error "IllegalArgumentException creating INDEX PIPELINE($name): $iae"
+        }
+
+        return response
+    }
+
+
+    Object getDataSources() {
+        HttpResponse<String> response = null
+        String url = null
+        url = "$fusionBase/api/connectors/datasources"
+        log.info "No app given, getting all datasources"
+        var collectionRequest = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofMinutes(1))
+                .header("Content-Type", "application/json")
+                .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
+                .GET()
+                .build()
+
+        response = httpClient.send(collectionRequest, HttpResponse.BodyHandlers.ofString())
+        int statusCode = response.statusCode()
+        String body = response.body()
+        def info = null
+        if (isSuccessResponse(response)) {
+            info = new JsonSlurper().parseText(body)
+            log.info("\t\t get datasources response: ${response.statusCode()}")
+        } else {
+            log.warn "Failed to get datasources: Status code: $statusCode -- ${body}"
+        }
+        return info
+    }
+
+
+    def createDataSource(Map<String, Object> map, String app) {
+        HttpResponse<String> response = null
+        JsonBuilder jsonBuilder = new JsonBuilder(map)
+        String name = map.id
+        String jsonToIndex = jsonBuilder.toString()
+        String connector = map.connector
+        try {
+            String url = "$fusionBase/api/apps/${app}/connectors/datasources"
+            log.info "\t Create DATASOURCES ($name) type($connector) url: $url -- Json text size::\t ${jsonToIndex.size()}"
+            var request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofMinutes(1))
+                    .header("Content-Type", "application/json")
+                    .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonToIndex))
+                    .build()
+
+            response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+            int statusCode = response.statusCode()
+            if (isSuccessResponse(response)) {
+                log.info("\t\t Create DATASOURCES response($name): ${response.statusCode()}")
+            } else {
+                String body = response.body()
+                log.warn "Failed to create DATASOURCES: $name? Status code: $statusCode "
+            }
+
+        } catch (IllegalArgumentException iae) {
+            log.error "IllegalArgumentException creating datasources($name): $iae"
+        }
+
+        return response
+    }
+
+    Object getLinks() {
+        HttpResponse<String> response = null
+        String url = "$fusionBase/api/links"
+        var collectionRequest = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofMinutes(1))
+                .header("Content-Type", "application/json")
+                .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
+                .GET()
+                .build()
+
+        response = httpClient.send(collectionRequest, HttpResponse.BodyHandlers.ofString())
+        int statusCode = response.statusCode()
+        String body = response.body()
+        def info = null
+        if (isSuccessResponse(response)) {
+            info = new JsonSlurper().parseText(body)
+            log.info("\t\t get links response: ${response.statusCode()}")
+        } else {
+            log.warn "Failed to get links: Status code: $statusCode -- ${body}"
+        }
+        return info
+    }
+
+    def createLink(Map<String, Object> map, String app) {
+        HttpResponse<String> response = null
+        String name = "${map.subject}:${map.object}::${map.linkType}"
+        JsonBuilder jsonBuilder = new JsonBuilder(map)
+        String jsonToIndex = jsonBuilder.toString()
+        try {
+            String url = "$fusionBase/api/links"
+            log.info "\t Create LINK ($name)  url: $url -- Json text size::\t ${jsonToIndex.size()}"
+            var request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofMinutes(1))
+                    .header("Content-Type", "application/json")
+                    .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
+                    .PUT(HttpRequest.BodyPublishers.ofString(jsonToIndex))
+                    .build()
+
+            response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+            int statusCode = response.statusCode()
+            if (isSuccessResponse(response)) {
+                log.info("\t\t Create LINK response($name): ${response.statusCode()}")
+            } else {
+                String body = response.body()
+                log.warn "Failed to create LINK: $name? Status code: $statusCode "
+            }
+
+        } catch (IllegalArgumentException iae) {
+            log.error "IllegalArgumentException creating LINK($name): $iae"
+        }
+
+        return response
     }
 }
