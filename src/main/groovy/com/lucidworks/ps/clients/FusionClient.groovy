@@ -117,6 +117,42 @@ class FusionClient {
     }
 
 
+
+
+    /**
+     * Get json "list" of applications defined in the cluster. See also: export
+     * @return
+     */
+    def getApplications() {
+        HttpResponse response = null
+        String url = "$fusionBase/api/apps"
+        log.info "\t\tExport Fusion applications url: $url"
+        def json = null
+        var request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofMinutes(1))
+                .header("Content-Type", "application/json")
+                .GET()
+                .build()
+        try {
+            response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+            int statusCode = response.statusCode()
+            if (isSuccessResponse(response)) {
+                log.info("\t\t Get Applications response: ${response.statusCode()}")
+            } else {
+                log.warn "Response shows unsuccessful? Status code: $statusCode -- $response"
+            }
+            JsonSlurper jsonSlurper = new JsonSlurper()
+            json = jsonSlurper.parseText(response.body())
+            log.debug "Json parsed: $json"
+        } catch (Exception e) {
+            log.error "Export exception: $e"
+        }
+
+        return json
+    }
+
+
     /**
      * setup method to establish creditials provider for Fusion auth (basic realm now, more to come...)
      * @param hostname
@@ -200,6 +236,26 @@ class FusionClient {
 //        // todo :: figure out what is a good way to get relevant version info, the calls in getFusionVersion don't have what I expect (version is 'local' for localhost 4.2.6)
 //        return "more to come RSN..."
 //    }
+
+
+    boolean isValidFusionClient() {
+        boolean valid = false
+        if (httpClient && sessionCookie && cookieMS) {
+            long nowMS = System.currentTimeMillis()
+            long cookieAgeMS = (nowMS - cookieMS)
+            if (cookieAgeMS > MAX_COOKIE_AGE_MS) {
+                log.warn "Cookie is older than MAX_COOKIE_AGE_MS ($MAX_COOKIE_AGE_MS), need to refresh... returning false for isValidFusionClient()"
+                valid = false
+            }
+            log.debug "\tFusion client seems valid, and we have a session cookie"
+            valid = true
+        } else {
+            log.info "fusionClient($httpClient) is not valid/current:: sessionCookie:$sessionCookie -- cookieMS:$cookieMS"
+            valid = false
+        }
+        return valid
+    }
+
 
 
     /**
@@ -381,24 +437,6 @@ class FusionClient {
     }
 
 
-    boolean isValidFusionClient() {
-        boolean valid = false
-        if (httpClient && sessionCookie && cookieMS) {
-            long nowMS = System.currentTimeMillis()
-            long cookieAgeMS = (nowMS - cookieMS)
-            if (cookieAgeMS > MAX_COOKIE_AGE_MS) {
-                log.warn "Cookie is older than MAX_COOKIE_AGE_MS ($MAX_COOKIE_AGE_MS), need to refresh... returning false for isValidFusionClient()"
-                valid = false
-            }
-            log.debug "\tFusion client seems valid, and we have a session cookie"
-            valid = true
-        } else {
-            log.info "fusionClient($httpClient) is not valid/current:: sessionCookie:$sessionCookie -- cookieMS:$cookieMS"
-            valid = false
-        }
-        return valid
-    }
-
     boolean isSuccessResponse(HttpResponse response) {
         int statusCode = response.statusCode()
         if (statusCode >= 200 && statusCode < 300) {
@@ -531,40 +569,6 @@ class FusionClient {
     }
 
 
-    /**
-     * Get json "list" of applications defined in the cluster. See also: export
-     * @return
-     */
-    def getApplications() {
-        HttpResponse response = null
-        String url = "$fusionBase/api/apps"
-        log.info "\t\tExport Fusion applications url: $url"
-        def json = null
-        var request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofMinutes(1))
-                .header("Content-Type", "application/json")
-                .GET()
-                .build()
-        try {
-            response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-            int statusCode = response.statusCode()
-            if (isSuccessResponse(response)) {
-                log.info("\t\t Get Applications response: ${response.statusCode()}")
-            } else {
-                log.warn "Response shows unsuccessful? Status code: $statusCode -- $response"
-            }
-            JsonSlurper jsonSlurper = new JsonSlurper()
-            json = jsonSlurper.parseText(response.body())
-            log.debug "Json parsed: $json"
-        } catch (Exception e) {
-            log.error "Export exception: $e"
-        }
-
-        return json
-    }
-
-
     HttpResponse<Path> exportFusionObjects(String exportParams, Path outputPath) {
         String url = "$fusionBase/api/objects/export?${exportParams}"
         log.info "\t\tExport Fusion objects url: $url"
@@ -591,9 +595,40 @@ class FusionClient {
     }
 
 
+    /**
+     * create an application
+     * TODO -- more code - implement
+     * @param properties
+     */
     def createApplication(Map properties) {
         String jsonProps = new JsonBuilder(properties)
 
+    }
+
+    List<Map> getCollections(String appName) {
+        HttpResponse<String> collectionResponse = null
+        String url = "$fusionBase/api/apps/${appName}/collections"
+        log.info "\t list collections for app $appName url: $url "
+        var collectionRequest = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofMinutes(1))
+                .header("Content-Type", "application/json")
+                .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
+                .GET()
+                .build()
+
+        collectionResponse = httpClient.send(collectionRequest, HttpResponse.BodyHandlers.ofString())
+        int statusCode = collectionResponse.statusCode()
+        String body = collectionResponse.body()
+        def collectionInfo = null
+        if (isSuccessResponse(collectionResponse)) {
+            collectionInfo = new JsonSlurper().parseText(body)
+            log.info("\t\t Create coll response: ${collectionResponse.statusCode()}")
+        } else {
+            log.warn "Response shows unsuccessful? Status code: $statusCode -- ${body}"
+        }
+
+        return collectionInfo
     }
 
 
@@ -634,32 +669,6 @@ class FusionClient {
         }
 
         return collectionResponse
-    }
-
-    List<Map> getCollections(String appName) {
-        HttpResponse<String> collectionResponse = null
-        String url = "$fusionBase/api/apps/${appName}/collections"
-        log.info "\t list collections for app $appName url: $url "
-        var collectionRequest = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofMinutes(1))
-                .header("Content-Type", "application/json")
-                .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
-                .GET()
-                .build()
-
-        collectionResponse = httpClient.send(collectionRequest, HttpResponse.BodyHandlers.ofString())
-        int statusCode = collectionResponse.statusCode()
-        String body = collectionResponse.body()
-        def collectionInfo = null
-        if (isSuccessResponse(collectionResponse)) {
-            collectionInfo = new JsonSlurper().parseText(body)
-            log.info("\t\t Create coll response: ${collectionResponse.statusCode()}")
-        } else {
-            log.warn "Response shows unsuccessful? Status code: $statusCode -- ${body}"
-        }
-
-        return collectionInfo
     }
 
     List getParsers(String appName) {
@@ -785,6 +794,98 @@ class FusionClient {
     }
 
 
+    Object getConnectorsRepository() {
+        HttpResponse<String> response = null
+        String url = null
+        url = "$fusionBase/connectors/repository"
+        log.info "getting all available connectors"
+        var collectionRequest = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofMinutes(1))
+                .header("Content-Type", "application/json")
+                .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
+                .GET()
+                .build()
+
+        response = httpClient.send(collectionRequest, HttpResponse.BodyHandlers.ofString())
+        int statusCode = response.statusCode()
+        String body = response.body()
+        def info = null
+        if (isSuccessResponse(response)) {
+            info = new JsonSlurper().parseText(body)
+            log.info("\t\t get datasources response: ${response.statusCode()}")
+        } else {
+            log.warn "Failed to get datasources: Status code: $statusCode -- ${body}"
+        }
+        return info
+    }
+
+
+    Object getConnectorsInstalled() {
+        HttpResponse<String> response = null
+        String url = null
+        url = "$fusionBase/api/connectors/plugins"
+        log.info "getting all installed connectors"
+        var collectionRequest = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofMinutes(1))
+                .header("Content-Type", "application/json")
+                .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
+                .GET()
+                .build()
+
+        response = httpClient.send(collectionRequest, HttpResponse.BodyHandlers.ofString())
+        int statusCode = response.statusCode()
+        String body = response.body()
+        def info = null
+        if (isSuccessResponse(response)) {
+            info = new JsonSlurper().parseText(body)
+            log.info("\t\t get datasources response: ${response.statusCode()}")
+        } else {
+            log.warn "Failed to get datasources: Status code: $statusCode -- ${body}"
+        }
+        return info
+    }
+
+
+    Object getConnectorsUsed(Map objectsMap) {
+        def dataSources = objectsMap['dataSources']
+        def connectorsGrouped = dataSources.groupBy { Map ds ->
+            ds.connector
+        }
+        return connectorsGrouped
+    }
+
+    def installConnector(String connectorId) {
+        HttpResponse<String> response = null
+        try {
+            String url = "$fusionBase/api/connectors/plugins?id=${connectorId}"
+            log.info "\t install connector plugin ($connectorId) from repository with url: $url"
+            var request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofMinutes(1))
+                    .header("Content-Type", "application/json")
+                    .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonToIndex))
+                    .build()
+
+            response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+            int statusCode = response.statusCode()
+            if (isSuccessResponse(response)) {
+                log.info("\t\t install CONNECTOR plugin (${connectorId}) -- response($response)")
+            } else {
+                String body = response.body()
+                log.warn "Failed to install CONNECTOR plugin (${connectorId}) -- : ${response}"
+            }
+
+        } catch (IllegalArgumentException iae) {
+            log.error "IllegalArgumentException creating datasources($connectorId): $iae"
+        }
+
+        return response
+    }
+
+
     Object getDataSources() {
         HttpResponse<String> response = null
         String url = null
@@ -835,7 +936,8 @@ class FusionClient {
                 log.info("\t\t Create DATASOURCES response($name): ${response.statusCode()}")
             } else {
                 String body = response.body()
-                log.warn "Failed to create DATASOURCES: $name? Status code: $statusCode "
+                String type = map.type
+                log.warn "Failed to create DATASOURCES (type:$type): $name? Status code: $statusCode \n\t\t object map: $map}"
             }
 
         } catch (IllegalArgumentException iae) {
@@ -900,4 +1002,6 @@ class FusionClient {
 
         return response
     }
+
+
 }
