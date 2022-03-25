@@ -55,22 +55,12 @@ class FusionClient {
             this.fusionBase = new URL(s[0..-2])
             log.warn "\tstripping trailing slash from baseUrl: '$s' => "
         }
-        log.debug "constructor: $baseUrl, $user, $pass :: calling buildClient..."
         httpClient = buildClient(fusionBase, user, password)
+        log.debug "constructor: $baseUrl, $user, $pass :: calling buildClient..."
+
     }
 
-/*
-    HttpClient buildClient() {
-        if (isValidFusionClient()) {
-            return httpClient
-        } else {
-            log.info "\tFusion client not valid, trying to get a valid version now (first call, or timeout...?)..."
-            log.debug "\t${this.class.name} getClient() using contructor set vars(baseurl: $fusionBase, user:$user, password <hidden>...)   [should only need to call this once...]"
-            httpClient = buildClient(fusionBase, user, password)
-            return httpClient
-        }
-    }
-*/
+
 
 /**
  * Get a JDK HttpClient with some defaults set for convenience
@@ -93,13 +83,7 @@ class FusionClient {
         log.info "\tInitializing Fusion client session via POST to session url: $urlSession"
 
         try {
-            var request = HttpRequest.newBuilder()
-                    .uri(URI.create(urlSession))
-                    .timeout(Duration.ofMinutes(2))
-                    .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(authJson))        // redundant with client.send below? no?? this adds the payload, BodyHandlers.ofString below builds the request string? no?? receives the response??
-                    .build()
+            HttpRequest request = buildPostRequest(urlSession, authJson)
 
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString())
             log.debug("\t\tResponse status: " + response.statusCode())
@@ -117,23 +101,17 @@ class FusionClient {
     }
 
 
-
-
     /**
      * Get json "list" of applications defined in the cluster. See also: export
      * @return
      */
-    def getApplications() {
+    List<Map<String, Object>> getApplications() {
         HttpResponse response = null
         String url = "$fusionBase/api/apps"
         log.info "\t\tExport Fusion applications url: $url"
         def json = null
-        var request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofMinutes(1))
-                .header("Content-Type", "application/json")
-                .GET()
-                .build()
+        HttpRequest request = buildGetRequest(url)
+
         try {
             response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
             int statusCode = response.statusCode()
@@ -154,49 +132,15 @@ class FusionClient {
 
 
     /**
-     * setup method to establish creditials provider for Fusion auth (basic realm now, more to come...)
-     * @param hostname
-     * @param port
-     * @param protocol
-     * @param user
-     * @param pass
-     * @return
-     */
-/*
-    def buildCredentialsProvider(String hostname, int port, String protocol, String user, String pass) {
-        credentialsProvider = new BasicCredentialsProvider()
-        HttpHost targetHost = new HttpHost(hostname, port, protocol)
-        credentialsProvider.setCredentials(
-                new AuthScope(targetHost.getHostName(), targetHost.getPort()),
-                new UsernamePasswordCredentials(user, pass)
-        )
-
-        AuthCache authCache = new BasicAuthCache()     // Create AuthCache instance
-        BasicScheme basicAuth = new BasicScheme()
-        // Generate BASIC scheme object and add it to the local auth cache
-        authCache.put(targetHost, basicAuth)
-        log.info "Initialized credentialsProvider: $credentialsProvider"
-    }
-*/
-
-
-    /**
      * trying to get general information, primarily fusion version, so we can adjust api syntax accordingly
      *
      * @return
      */
     def getFusionInformation() {
-        var reqApi = HttpRequest.newBuilder()
-                .uri(URI.create("${this.fusionBase}/api"))
-                .GET()
-                .timeout(Duration.ofMinutes(2))
-                .setHeader("User-Agent", "Java 11+ HttpClient FusionPS Bot") // add request header
-//                .header("Content-Type", "application/json")
-                .build()
-
         JsonSlurper jsonSlurper = new JsonSlurper()
+        HttpRequest request = buildGetRequest(url)
 
-        HttpResponse<String> response = httpClient.send(reqApi, HttpResponse.BodyHandlers.ofString())
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
         int rc = response.statusCode()
         if (rc >= 200 && rc < 300) {
             log.debug("Response from getFusionInformation() ${response.statusCode()}")
@@ -215,7 +159,7 @@ class FusionClient {
 //                .header("Content-Type", "application/json")
                 .build()
 
-        HttpResponse<String> respIntro = httpClient.send(reqApi, HttpResponse.BodyHandlers.ofString())
+        HttpResponse<String> respIntro = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
         rc = respIntro.statusCode()
         if (rc >= 200 && rc < 300) {
 
@@ -257,7 +201,6 @@ class FusionClient {
     }
 
 
-
     /**
      * execute 'basic query'
      * e.g. https://radar.lucidworks.com/api/apps/Lucy/query-pipelines/lucy-basic-qryp/collections/Lucy/select?echoParams=all&wt=json&json.nl=arrarr&debug=timing&debug=query&debug=results&fl=score,*&sort&start=0&q=Joti dhillon (csm "customer success")&rows=10
@@ -273,10 +216,7 @@ class FusionClient {
         URI uri = URI.create(ub.toString())
         log.info "\t\tprepared uri: $uri"
 
-        var request = HttpRequest.newBuilder()
-                .GET()
-                .uri(uri)
-                .build()
+        HttpRequest request = buildGetRequest(url)
 
         HttpResponse<String> queryResponse = null
         try {
@@ -352,11 +292,6 @@ class FusionClient {
         HttpResponse<String> indexResponse = null
         try {
             String url = "$fusionBase/api/index-pipelines/${indexPipeline}/collections/${collection}/index?commit=${commit}"
-            if (log.isDebugEnabled()) {
-                log.debug "\t indexContent url: $url -- Json:\t $jsonToIndex"
-            } else {
-                log.info "\t indexContent url: $url -- Json text size::\t ${jsonToIndex.size()}"
-            }
             var indexRequest = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .timeout(Duration.ofMinutes(1))
@@ -402,7 +337,7 @@ class FusionClient {
             log.debug "\t indexContent url: $url -- Json:\t $jsonToIndex"
             long start = System.currentTimeMillis()
 
-            var indexRequest = HttpRequest.newBuilder()
+            var request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .timeout(Duration.ofMinutes(1))
                     .header("Content-Type", "application/json")
@@ -413,7 +348,7 @@ class FusionClient {
             long elapsed = end - start
             log.debug "\t\tElapsed time1: ${elapsed}ms (${elapsed / 1000} sec) -- build HttpRequest to post/index content"
 
-            indexResponse = httpClient.send(indexRequest, HttpResponse.BodyHandlers.ofString())
+            indexResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
 
             end = System.currentTimeMillis()
             elapsed = end - start
@@ -572,12 +507,8 @@ class FusionClient {
     HttpResponse<Path> exportFusionObjects(String exportParams, Path outputPath) {
         String url = "$fusionBase/api/objects/export?${exportParams}"
         log.info "\t\tExport Fusion objects url: $url"
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofMinutes(5))
-                .header("Content-Type", "application/json")
-                .GET()
-                .build()
+        HttpRequest collectionRequest = buildGetRequest(url)
+
         HttpResponse<Path> fileResponse = null
         try {
             fileResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofFile(outputPath))
@@ -602,22 +533,16 @@ class FusionClient {
      */
     def createApplication(Map properties) {
         String jsonProps = new JsonBuilder(properties)
-
+        log.warn "more code here...?"
     }
 
     List<Map> getCollections(String appName) {
         HttpResponse<String> collectionResponse = null
         String url = "$fusionBase/api/apps/${appName}/collections"
         log.info "\t list collections for app $appName url: $url "
-        var collectionRequest = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofMinutes(1))
-                .header("Content-Type", "application/json")
-                .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
-                .GET()
-                .build()
+        HttpRequest request = buildGetRequest(url)
 
-        collectionResponse = httpClient.send(collectionRequest, HttpResponse.BodyHandlers.ofString())
+        collectionResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
         int statusCode = collectionResponse.statusCode()
         String body = collectionResponse.body()
         def collectionInfo = null
@@ -675,15 +600,9 @@ class FusionClient {
         HttpResponse<String> response = null
         String url = "$fusionBase/api/parsers"
         log.info "\t list parsers for url: $url "
-        var collectionRequest = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofMinutes(1))
-                .header("Content-Type", "application/json")
-                .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
-                .GET()
-                .build()
+        HttpRequest collectionRequest = buildGetRequest(url)
 
-        response = httpClient.send(collectionRequest, HttpResponse.BodyHandlers.ofString())
+        response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
         int statusCode = response.statusCode()
         String body = response.body()
         def info = null
@@ -739,15 +658,9 @@ class FusionClient {
             log.info "No app given, getting all index pipelines..."
         }
         log.info "\t list idx pipelines for url: $url "
-        var collectionRequest = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofMinutes(1))
-                .header("Content-Type", "application/json")
-                .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
-                .GET()
-                .build()
+        HttpRequest collectionRequest = buildGetRequest(url)
 
-        response = httpClient.send(collectionRequest, HttpResponse.BodyHandlers.ofString())
+        response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
         int statusCode = response.statusCode()
         String body = response.body()
         def info = null
@@ -769,13 +682,7 @@ class FusionClient {
         try {
             String url = "$fusionBase/api/apps/${app}/index-pipelines"
             log.info "\t Create INDEX PIPELINE ($name) url: $url -- Json text size::\t ${jsonToIndex.size()}"
-            var request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(Duration.ofMinutes(1))
-                    .header("Content-Type", "application/json")
-                    .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
-                    .POST(HttpRequest.BodyPublishers.ofString(jsonToIndex))
-                    .build()
+            HttpRequest request = buildPostRequest(url, jsonToIndex)
 
             response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
             int statusCode = response.statusCode()
@@ -799,13 +706,7 @@ class FusionClient {
         String url = null
         url = "$fusionBase/connectors/repository"
         log.info "getting all available connectors"
-        var collectionRequest = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofMinutes(1))
-                .header("Content-Type", "application/json")
-                .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
-                .GET()
-                .build()
+        HttpRequest collectionRequest = buildGetRequest(url)
 
         response = httpClient.send(collectionRequest, HttpResponse.BodyHandlers.ofString())
         int statusCode = response.statusCode()
@@ -826,13 +727,7 @@ class FusionClient {
         String url = null
         url = "$fusionBase/api/connectors/plugins"
         log.info "getting all installed connectors"
-        var collectionRequest = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofMinutes(1))
-                .header("Content-Type", "application/json")
-                .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
-                .GET()
-                .build()
+        HttpRequest collectionRequest = buildGetRequest(url)
 
         response = httpClient.send(collectionRequest, HttpResponse.BodyHandlers.ofString())
         int statusCode = response.statusCode()
@@ -856,18 +751,12 @@ class FusionClient {
         return connectorsGrouped
     }
 
-    def installConnector(String connectorId) {
+    HttpResponse<String> installConnector(String connectorId) {
         HttpResponse<String> response = null
         try {
             String url = "$fusionBase/api/connectors/plugins?id=${connectorId}"
             log.info "\t install connector plugin ($connectorId) from repository with url: $url"
-            var request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(Duration.ofMinutes(1))
-                    .header("Content-Type", "application/json")
-                    .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
-                    .POST(HttpRequest.BodyPublishers.ofString(jsonToIndex))
-                    .build()
+            HttpRequest request = buildPostRequest(url, jsonToIndex)
 
             response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
             int statusCode = response.statusCode()
@@ -888,16 +777,29 @@ class FusionClient {
 
     Object getDataSources() {
         HttpResponse<String> response = null
-        String url = null
-        url = "$fusionBase/api/connectors/datasources"
+        String url = "$fusionBase/api/connectors/datasources"
         log.info "No app given, getting all datasources"
-        var collectionRequest = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofMinutes(1))
-                .header("Content-Type", "application/json")
-                .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
-                .GET()
-                .build()
+        HttpRequest collectionRequest = buildGetRequest(url)
+
+        response = httpClient.send(collectionRequest, HttpResponse.BodyHandlers.ofString())
+        int statusCode = response.statusCode()
+        String body = response.body()
+        def info = null
+        if (isSuccessResponse(response)) {
+            info = new JsonSlurper().parseText(body)
+            log.info("\t\t get datasources response: ${response.statusCode()}")
+        } else {
+            log.warn "Failed to get datasources: Status code: $statusCode -- ${body}"
+        }
+        return info
+    }
+
+
+    List<Map<String,Object>> getDataSources(String appName) {
+        HttpResponse<String> response = null
+        String url = "$fusionBase/api/apps/${appName}/connectors/datasources"
+        log.info "No app given, getting all datasources"
+        HttpRequest collectionRequest = buildGetRequest(url)
 
         response = httpClient.send(collectionRequest, HttpResponse.BodyHandlers.ofString())
         int statusCode = response.statusCode()
@@ -922,13 +824,7 @@ class FusionClient {
         try {
             String url = "$fusionBase/api/apps/${app}/connectors/datasources"
             log.info "\t Create DATASOURCES ($name) type($connector) url: $url -- Json text size::\t ${jsonToIndex.size()}"
-            var request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(Duration.ofMinutes(1))
-                    .header("Content-Type", "application/json")
-                    .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
-                    .POST(HttpRequest.BodyPublishers.ofString(jsonToIndex))
-                    .build()
+            HttpRequest request = buildPostRequest(url, jsonToIndex)
 
             response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
             int statusCode = response.statusCode()
@@ -947,18 +843,12 @@ class FusionClient {
         return response
     }
 
-    Object getLinks() {
+    List<Map<String,String>> getLinks() {
         HttpResponse<String> response = null
         String url = "$fusionBase/api/links"
-        var collectionRequest = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofMinutes(1))
-                .header("Content-Type", "application/json")
-                .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
-                .GET()
-                .build()
+        HttpRequest request = buildGetRequest(url)
 
-        response = httpClient.send(collectionRequest, HttpResponse.BodyHandlers.ofString())
+        response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
         int statusCode = response.statusCode()
         String body = response.body()
         def info = null
@@ -971,7 +861,7 @@ class FusionClient {
         return info
     }
 
-    def createLink(Map<String, Object> map, String app) {
+    HttpResponse<String> createLink(Map<String, Object> map, String app) {
         HttpResponse<String> response = null
         String name = "${map.subject}:${map.object}::${map.linkType}"
         JsonBuilder jsonBuilder = new JsonBuilder(map)
@@ -979,13 +869,7 @@ class FusionClient {
         try {
             String url = "$fusionBase/api/links"
             log.info "\t Create LINK ($name)  url: $url -- Json text size::\t ${jsonToIndex.size()}"
-            var request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(Duration.ofMinutes(1))
-                    .header("Content-Type", "application/json")
-                    .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
-                    .PUT(HttpRequest.BodyPublishers.ofString(jsonToIndex))
-                    .build()
+            HttpRequest request = buildPutRequest(url, jsonToIndex)
 
             response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
             int statusCode = response.statusCode()
@@ -1001,6 +885,40 @@ class FusionClient {
         }
 
         return response
+    }
+
+    HttpRequest buildPutRequest(String url, String jsonToIndex) {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofMinutes(1))
+                .header("Content-Type", "application/json")
+                .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
+                .PUT(HttpRequest.BodyPublishers.ofString(jsonToIndex))
+                .build()
+        return request
+    }
+
+
+    HttpRequest buildGetRequest(String url) {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofMinutes(1))
+                .header("Content-Type", "application/json")
+                .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
+                .GET()
+                .build()
+        return request
+    }
+
+    HttpRequest buildPostRequest(String url, String jsonToIndex) {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofMinutes(1))
+                .header("Content-Type", "application/json")
+                .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
+                .POST(HttpRequest.BodyPublishers.ofString(jsonToIndex))
+                .build()
+        return request
     }
 
 
