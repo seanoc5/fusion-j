@@ -39,6 +39,7 @@ class FusionClient {
     Long cookieMS
     long MAX_COOKIE_AGE_MS = 1000 * 60 * 15
     // starting with default of 15 minutes for cookie age?      // todo -- revisit, make this more accessible
+    List<FusionResponseWrapper> responses = []
 
     FusionClient(String baseUrl, String user, String pass) {
         this(new URL(baseUrl), user, pass)
@@ -59,7 +60,6 @@ class FusionClient {
         log.debug "constructor: $baseUrl, $user, $pass :: calling buildClient..."
 
     }
-
 
 
 /**
@@ -86,6 +86,8 @@ class FusionClient {
             HttpRequest request = buildPostRequest(urlSession, authJson)
 
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString())
+            FusionResponseWrapper fusionResponseWrapper = new FusionResponseWrapper(request,response)
+            responses << fusionResponseWrapper
             log.debug("\t\tResponse status: " + response.statusCode())
             sessionCookie = response.headers().firstValue("set-cookie")
             cookieMS = System.currentTimeMillis()
@@ -109,25 +111,10 @@ class FusionClient {
         HttpResponse response = null
         String url = "$fusionBase/api/apps"
         log.info "\t\tExport Fusion applications url: $url"
-        def json = null
         HttpRequest request = buildGetRequest(url)
-
-        try {
-            response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-            int statusCode = response.statusCode()
-            if (isSuccessResponse(response)) {
-                log.info("\t\t Get Applications response: ${response.statusCode()}")
-            } else {
-                log.warn "Response shows unsuccessful? Status code: $statusCode -- $response"
-            }
-            JsonSlurper jsonSlurper = new JsonSlurper()
-            json = jsonSlurper.parseText(response.body())
-            log.debug "Json parsed: $json"
-        } catch (Exception e) {
-            log.error "Export exception: $e"
-        }
-
-        return json
+        FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
+        List<Map<String, Object>> applications = fusionResponseWrapper.parsedInfo
+        return applications
     }
 
 
@@ -531,29 +518,49 @@ class FusionClient {
      * TODO -- more code - implement
      * @param properties
      */
-    def createApplication(Map properties) {
-        String jsonProps = new JsonBuilder(properties)
-        log.warn "more code here...?"
+    def createApplication(Map properties, boolean relatedObjects = true) {
+        HttpResponse<String> response = null
+        JsonBuilder jsonBuilder = new JsonBuilder(properties)
+        String jsonToIndex = jsonBuilder.toString()
+        String id = properties.id
+        String name = properties.name
+        Collection info = null
+        try {
+            String url = "$fusionBase/api/apps"
+            log.info "\t Create APP ($name) url: $url -- Json text size::\t ${jsonToIndex.size()} with object id: $id"
+            HttpRequest request = buildPostRequest(url, jsonToIndex)
+
+            info = sendFusionRequest(request)
+
+        } catch (Exception e) {
+            log.error "Error: $e"
+        }
+    }
+
+    public FusionResponseWrapper sendFusionRequest(HttpRequest request) {
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+        FusionResponseWrapper fusionResponse = new FusionResponseWrapper(request,response)
+        return fusionResponse
     }
 
     List<Map> getCollections(String appName) {
-        HttpResponse<String> collectionResponse = null
+        HttpResponse<String> response = null
         String url = "$fusionBase/api/apps/${appName}/collections"
         log.info "\t list collections for app $appName url: $url "
         HttpRequest request = buildGetRequest(url)
 
-        collectionResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-        int statusCode = collectionResponse.statusCode()
-        String body = collectionResponse.body()
-        def collectionInfo = null
-        if (isSuccessResponse(collectionResponse)) {
-            collectionInfo = new JsonSlurper().parseText(body)
-            log.info("\t\t Create coll response: ${collectionResponse.statusCode()}")
+        response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+        int statusCode = response.statusCode()
+        String body = response.body()
+        def info = null
+        if (isSuccessResponse(response)) {
+            info = new JsonSlurper().parseText(body)
+            log.info("\t\t Create coll response: ${response.statusCode()}")
         } else {
             log.warn "Response shows unsuccessful? Status code: $statusCode -- ${body}"
         }
 
-        return collectionInfo
+        return info
     }
 
 
@@ -570,7 +577,7 @@ class FusionClient {
         JsonBuilder jsonBuilder = new JsonBuilder([id: collName])
         String jsonToIndex = jsonBuilder.toString()
         try {
-            String url = "$fusionBase/api/apps/${appName}/collections"
+            String url = "$fusionBase/api/apps/${appName}/collections"      // todo: add defaultFeatures?
             log.info "\t Create COLLECTION ($collName) url: $url -- Json text size::\t ${jsonToIndex.size()}"
             var collectionRequest = HttpRequest.newBuilder()
                     .uri(URI.create(url))
@@ -600,7 +607,7 @@ class FusionClient {
         HttpResponse<String> response = null
         String url = "$fusionBase/api/parsers"
         log.info "\t list parsers for url: $url "
-        HttpRequest collectionRequest = buildGetRequest(url)
+        HttpRequest  request = buildGetRequest(url)
 
         response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
         int statusCode = response.statusCode()
@@ -658,7 +665,7 @@ class FusionClient {
             log.info "No app given, getting all index pipelines..."
         }
         log.info "\t list idx pipelines for url: $url "
-        HttpRequest collectionRequest = buildGetRequest(url)
+        HttpRequest request = buildGetRequest(url)
 
         response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
         int statusCode = response.statusCode()
@@ -706,9 +713,9 @@ class FusionClient {
         String url = null
         url = "$fusionBase/connectors/repository"
         log.info "getting all available connectors"
-        HttpRequest collectionRequest = buildGetRequest(url)
+        HttpRequest request = buildGetRequest(url)
 
-        response = httpClient.send(collectionRequest, HttpResponse.BodyHandlers.ofString())
+        response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
         int statusCode = response.statusCode()
         String body = response.body()
         def info = null
@@ -727,9 +734,9 @@ class FusionClient {
         String url = null
         url = "$fusionBase/api/connectors/plugins"
         log.info "getting all installed connectors"
-        HttpRequest collectionRequest = buildGetRequest(url)
+        HttpRequest request = buildGetRequest(url)
 
-        response = httpClient.send(collectionRequest, HttpResponse.BodyHandlers.ofString())
+        response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
         int statusCode = response.statusCode()
         String body = response.body()
         def info = null
@@ -779,9 +786,9 @@ class FusionClient {
         HttpResponse<String> response = null
         String url = "$fusionBase/api/connectors/datasources"
         log.info "No app given, getting all datasources"
-        HttpRequest collectionRequest = buildGetRequest(url)
+        HttpRequest request = buildGetRequest(url)
 
-        response = httpClient.send(collectionRequest, HttpResponse.BodyHandlers.ofString())
+        response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
         int statusCode = response.statusCode()
         String body = response.body()
         def info = null
@@ -795,23 +802,14 @@ class FusionClient {
     }
 
 
-    List<Map<String,Object>> getDataSources(String appName) {
+    List<Map<String, Object>> getDataSources(String appName) {
         HttpResponse<String> response = null
         String url = "$fusionBase/api/apps/${appName}/connectors/datasources"
-        log.info "No app given, getting all datasources"
-        HttpRequest collectionRequest = buildGetRequest(url)
-
-        response = httpClient.send(collectionRequest, HttpResponse.BodyHandlers.ofString())
-        int statusCode = response.statusCode()
-        String body = response.body()
-        def info = null
-        if (isSuccessResponse(response)) {
-            info = new JsonSlurper().parseText(body)
-            log.info("\t\t get datasources response: ${response.statusCode()}")
-        } else {
-            log.warn "Failed to get datasources: Status code: $statusCode -- ${body}"
-        }
-        return info
+        log.info "app (${appName}) given, getting all datasources"
+        HttpRequest request = buildGetRequest(url)
+        FusionResponseWrapper fusionResponse = sendFusionRequest(request)
+        responses<< fusionResponse
+        return fusionResponse.parsedInfo
     }
 
 
@@ -843,7 +841,7 @@ class FusionClient {
         return response
     }
 
-    List<Map<String,String>> getLinks() {
+    List<Map<String, String>> getLinks() {
         HttpResponse<String> response = null
         String url = "$fusionBase/api/links"
         HttpRequest request = buildGetRequest(url)
