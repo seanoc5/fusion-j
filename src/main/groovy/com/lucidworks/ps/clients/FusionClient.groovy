@@ -1,7 +1,9 @@
 package com.lucidworks.ps.clients
 
+import groovy.cli.picocli.OptionAccessor
 import groovy.json.JsonBuilder
 import groovy.json.JsonSlurper
+import org.apache.http.auth.AuthenticationException
 import org.apache.http.client.utils.URIBuilder
 import org.apache.log4j.Logger
 
@@ -28,18 +30,20 @@ import java.time.Duration
  */
 class FusionClient {
     protected static Logger log = Logger.getLogger(this.class.name)
-    String user
-    String password
+    String user= null
+    String password= null
 
-    String fusionBase
-    HttpClient httpClient
-    private String sessionCookie
-    Map introspectInfo
-    Map apiInfo
-    Long cookieMS
-    long MAX_COOKIE_AGE_MS = 1000 * 60 * 15
-    // starting with default of 15 minutes for cookie age?      // todo -- revisit, make this more accessible
-    List<FusionResponseWrapper> responses = []
+    String fusionBase= null
+    HttpClient httpClient= null
+    private String sessionCookie= null
+    File objectsJsonFile = null
+    File exportDirectory = null
+    String objectsGroup = null
+    Map introspectInfo= null
+    Map apiInfo= null
+    Long cookieMS= null
+    long MAX_COOKIE_AGE_MS = 1000 * 60 * 15                     // starting with default of 15 minutes for cookie age?   todo -- revisit, make this more accessible
+    List<FusionResponseWrapper> responses = []                  // todo -- look at potential OOM issues for long running client
 
     FusionClient(String baseUrl, String user, String pass) {
         this(new URL(baseUrl), user, pass)
@@ -56,10 +60,54 @@ class FusionClient {
             this.fusionBase = new URL(s[0..-2])
             log.warn "\tstripping trailing slash from baseUrl: '$s' => "
         }
-        httpClient = buildClient(fusionBase, user, password)
         log.debug "constructor: $baseUrl, $user, $pass :: calling buildClient..."
-
+        httpClient = buildClient(fusionBase, user, password)
     }
+
+    FusionClient(OptionAccessor options){
+        fusionBase = options.f
+        user = options.u                            // fusion username for destination of new/migrated app
+        password = options.p
+        String srcObjectJsonPath = options.s                // todo -- add logic to read configs from live fusion (needs source: url, pass, furl, appname)
+        objectsJsonFile = new File(srcObjectJsonPath)
+        if(objectsJsonFile.isFile() && objectsJsonFile.exists()){
+            log.info "Source file exists: ${objectsJsonFile.absolutePath}"
+        } else {
+            log.warn "Source file exists: ${objectsJsonFile.absolutePath} does NOT EXIST..."
+        }
+
+        objectsGroup = options.g
+        String x = options.x ?: null
+        if(x){
+            exportDirectory = new File(x)
+            if(exportDirectory.exists()){
+              if(exportDirectory.isDirectory()) {
+                  log.debug "Got reasonable export dir: ${exportDirectory.absolutePath}"
+              } else {
+                  String msg = "Export directory not a directory: ${exportDirectory.absolutePath}"
+                  log.error msg
+                  throw new IllegalArgumentException(msg)
+              }
+            } else {
+                exportDirectory = new File(exportDir)
+                if(exportDirectory.mkdir()){
+                    log.warn "Export dir($exportDir) did not exist, but we were able to make it (one child deep): ${exportDirectory.absolutePath}"
+                }
+            }
+        }
+
+        log.info """Initialized FusionClient with command line options:
+            Fusion Url:     ${fusionBase}
+            Src json:       $objectsJsonFile
+            User:           $user
+            Password:       [redacted]
+            Group Name:     $objectsGroup
+            Export dir:     $exportDirectory
+        """
+        httpClient = buildClient(fusionBase, user, password)
+        log.debug "finished clibuilder options constructor..."
+    }
+
 
 
 /**
@@ -82,22 +130,26 @@ class FusionClient {
         String urlSession = "${baseUrl}/api/session"
         log.info "\tInitializing Fusion client session via POST to session url: $urlSession"
 
-        try {
+//        try {
             HttpRequest request = buildPostRequest(urlSession, authJson)
 
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString())
             FusionResponseWrapper fusionResponseWrapper = new FusionResponseWrapper(request,response)
             responses << fusionResponseWrapper
-            log.debug("\t\tResponse status: " + response.statusCode())
-            sessionCookie = response.headers().firstValue("set-cookie")
-            cookieMS = System.currentTimeMillis()
-            Date ts = new Date(cookieMS)
-            log.info("\tSession cookie: ${this.sessionCookie} set/refreshed at timestamp: $cookieMS (${ts})")
-
-        } catch (Exception e) {
-            log.warn "Problem getting client: $e"
-            client = null
-        }
+            if(response.statusCode() < 300 ) {
+                log.debug("\t\tResponse status: " + response.statusCode())
+                sessionCookie = response.headers().firstValue("set-cookie")
+                cookieMS = System.currentTimeMillis()
+                Date ts = new Date(cookieMS)
+                log.info("\tSession cookie: ${this.sessionCookie} set/refreshed at timestamp: $cookieMS (${ts})")
+            } else {
+                log.error "Bad status code creating client (incorrect auth??), Status Code: ${response.statusCode()} -- body: ${response.body()}"
+                throw new AuthenticationException("Could not create Fusion Client (${response.body()})")
+            }
+//        } catch (Exception e) {
+//            log.warn "Problem getting client: $e"
+//            client = null
+//        }
 
         return client
     }
@@ -531,7 +583,7 @@ class FusionClient {
             HttpRequest request = buildPostRequest(url, jsonToIndex)
 
             info = sendFusionRequest(request)
-
+            log.info "Created app? $info"
         } catch (Exception e) {
             log.error "Error: $e"
         }
@@ -838,6 +890,7 @@ class FusionClient {
             log.error "IllegalArgumentException creating datasources($name): $iae"
         }
 
+        // todo convert over to FusionResponseWrapper ??
         return response
     }
 

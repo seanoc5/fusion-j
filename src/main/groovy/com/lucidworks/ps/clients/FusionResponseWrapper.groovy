@@ -11,13 +11,15 @@ class FusionResponseWrapper {
     HttpRequest origRequest
     HttpResponse response
     String responseText
-    Collection parsedInfo
+    Map parsedMap
+    List parsedList
+    def parsedInfo
     Integer statusCode
     Date timestamp
 
     FusionResponseWrapper(HttpRequest origRequest, HttpResponse fusionResponse) {
         // todo -- revisit if we process anything other than JSON responses (request/response specify json --text)
-        log.info "Standard Constructor (req, resp): req:$origRequest -- resp:$fusionResponse"
+        log.debug "\t\tStandard FusionResponseWrapper Constructor (req, resp): req:$origRequest -- resp:$fusionResponse"
         statusCode = fusionResponse.statusCode()
         this.timestamp = new Date()
         this.origRequest = origRequest
@@ -26,7 +28,20 @@ class FusionResponseWrapper {
         this.responseText = response.body()
         if(this.responseText) {
             JsonSlurper jsonSlurper = new JsonSlurper()
-            parsedInfo = jsonSlurper.parseText(this.responseText)
+            def obj = jsonSlurper.parseText(this.responseText)
+            try {
+                if(obj instanceof List) {
+                    parsedList = obj
+                    log.debug "\t\tGot back a list for request: $origRequest"
+                } else if(obj instanceof Map){
+                    parsedMap = obj
+                    log.debug "\t\tGot back a Map for request: $origRequest"
+                }
+                parsedInfo = obj
+            } catch (Exception e){
+                log.warn "Bad groovy-ness?? Map vs List vs 'def' issues?? error: $e"
+            }
+            log.debug "parsed..."
         } else {
             log.info "No response text??? $fusionResponse"
         }
