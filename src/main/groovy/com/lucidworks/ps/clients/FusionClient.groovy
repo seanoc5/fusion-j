@@ -1,9 +1,8 @@
 package com.lucidworks.ps.clients
 
-import groovy.cli.picocli.OptionAccessor
+
 import groovy.json.JsonBuilder
 import groovy.json.JsonSlurper
-import org.apache.http.auth.AuthenticationException
 import org.apache.http.client.utils.URIBuilder
 import org.apache.log4j.Logger
 
@@ -12,7 +11,6 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.nio.file.Path
 import java.time.Duration
-
 /**
  * attempt to replicate solrj client-ness for fusion
  * using cookies and session api to start with
@@ -576,7 +574,7 @@ class FusionClient {
         String jsonToIndex = jsonBuilder.toString()
         String id = properties.id
         String name = properties.name
-        Collection info = null
+        def info = null
         try {
             String url = "$fusionBase/api/apps"
             log.info "\t Create APP ($name) url: $url -- Json text size::\t ${jsonToIndex.size()} with object id: $id"
@@ -601,18 +599,9 @@ class FusionClient {
         log.info "\t list collections for app $appName url: $url "
         HttpRequest request = buildGetRequest(url)
 
-        response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-        int statusCode = response.statusCode()
-        String body = response.body()
-        def info = null
-        if (isSuccessResponse(response)) {
-            info = new JsonSlurper().parseText(body)
-            log.info("\t\t Create coll response: ${response.statusCode()}")
-        } else {
-            log.warn "Response shows unsuccessful? Status code: $statusCode -- ${body}"
-        }
+        FusionResponseWrapper responseWrapper = sendFusionRequest(request)
 
-        return info
+        return responseWrapper.parsedInfo
     }
 
 
@@ -631,22 +620,11 @@ class FusionClient {
         try {
             String url = "$fusionBase/api/apps/${appName}/collections"      // todo: add defaultFeatures?
             log.info "\t Create COLLECTION ($collName) url: $url -- Json text size::\t ${jsonToIndex.size()}"
-            var collectionRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(Duration.ofMinutes(1))
-                    .header("Content-Type", "application/json")
-                    .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
-                    .POST(HttpRequest.BodyPublishers.ofString(jsonToIndex))
-                    .build()
+            HttpRequest request = buildPostRequest(url, jsonToIndex)
 
-            collectionResponse = httpClient.send(collectionRequest, HttpResponse.BodyHandlers.ofString())
-            int statusCode = collectionResponse.statusCode()
-            if (isSuccessResponse(collectionResponse)) {
-                log.info("\t\t Create coll response: ${collectionResponse.statusCode()}")
-            } else {
-                String body = collectionResponse.body()
-                log.warn "Response shows unsuccessful? Status code: $statusCode -- ${body}"
-            }
+            FusionResponseWrapper responseWrapper = sendFusionRequest(request)
+
+            collectionResponse = responseWrapper.response
 
         } catch (IllegalArgumentException iae) {
             log.error "IllegalArgumentException: $iae"
@@ -661,18 +639,9 @@ class FusionClient {
         log.info "\t list parsers for url: $url "
         HttpRequest  request = buildGetRequest(url)
 
-        response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-        int statusCode = response.statusCode()
-        String body = response.body()
-        def info = null
-        if (isSuccessResponse(response)) {
-            info = new JsonSlurper().parseText(body)
-            log.info("\t\t get parser response: ${response.statusCode()}")
-        } else {
-            log.warn "Response shows unsuccessful? Status code: $statusCode -- ${body}"
-        }
+        FusionResponseWrapper responseWrapper = sendFusionRequest(request)
 
-        return info
+        return responseWrapper.parsedInfo
     }
 
     def createParser(Map<String, Object> map, String app) {
@@ -680,25 +649,14 @@ class FusionClient {
         JsonBuilder jsonBuilder = new JsonBuilder(map)
         String name = map.id
         String jsonToIndex = jsonBuilder.toString()
+        String url = "$fusionBase/api/apps/${app}/parsers"
         try {
-            String url = "$fusionBase/api/apps/${app}/parsers"
             log.info "\t Create PARSER ($name) url: $url -- Json text size::\t ${jsonToIndex.size()}"
-            var request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(Duration.ofMinutes(1))
-                    .header("Content-Type", "application/json")
-                    .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
-                    .POST(HttpRequest.BodyPublishers.ofString(jsonToIndex))
-                    .build()
+            HttpRequest request = buildPostRequest(url, jsonToIndex)
 
-            response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-            int statusCode = response.statusCode()
-            if (isSuccessResponse(response)) {
-                log.info("\t\t Create PARSER response($name): ${response.statusCode()}")
-            } else {
-                String body = response.body()
-                log.warn "Failed to create parser: $name? Status code: $statusCode -- ${body}"
-            }
+            FusionResponseWrapper responseWrapper = sendFusionRequest(request)
+
+            return responseWrapper.parsedInfo
 
         } catch (IllegalArgumentException iae) {
             log.error "IllegalArgumentException creating parser($name): $iae"
@@ -718,19 +676,9 @@ class FusionClient {
         }
         log.info "\t list idx pipelines for url: $url "
         HttpRequest request = buildGetRequest(url)
+        FusionResponseWrapper responseWrapper = sendFusionRequest(request)
 
-        response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-        int statusCode = response.statusCode()
-        String body = response.body()
-        def info = null
-        if (isSuccessResponse(response)) {
-            info = new JsonSlurper().parseText(body)
-            log.info("\t\t get idx pipelines response for app: $app: ${response.statusCode()}")
-        } else {
-            log.warn "Failed to get idx pipelines for app: $app? Status code: $statusCode -- ${body}"
-        }
-
-        return info
+        return responseWrapper.parsedInfo
     }
 
     def createIndexPipeline(Map<String, Object> map, String app) {
@@ -743,14 +691,9 @@ class FusionClient {
             log.info "\t Create INDEX PIPELINE ($name) url: $url -- Json text size::\t ${jsonToIndex.size()}"
             HttpRequest request = buildPostRequest(url, jsonToIndex)
 
-            response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-            int statusCode = response.statusCode()
-            if (isSuccessResponse(response)) {
-                log.info("\t\t Create INDEX PIPELINE response($name): ${response.statusCode()}")
-            } else {
-                String body = response.body()
-                log.warn "Failed to create INDEX PIPELINE: $name? Status code: $statusCode -- ${body}"
-            }
+            FusionResponseWrapper responseWrapper = sendFusionRequest(request)
+
+            response = responseWrapper.response
 
         } catch (IllegalArgumentException iae) {
             log.error "IllegalArgumentException creating INDEX PIPELINE($name): $iae"
@@ -761,23 +704,12 @@ class FusionClient {
 
 
     Object getConnectorsRepository() {
-        HttpResponse<String> response = null
-        String url = null
-        url = "$fusionBase/connectors/repository"
+        String url = "$fusionBase/connectors/repository"
         log.info "getting all available connectors"
         HttpRequest request = buildGetRequest(url)
+        FusionResponseWrapper responseWrapper = sendFusionRequest(request)
 
-        response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-        int statusCode = response.statusCode()
-        String body = response.body()
-        def info = null
-        if (isSuccessResponse(response)) {
-            info = new JsonSlurper().parseText(body)
-            log.info("\t\t get datasources response: ${response.statusCode()}")
-        } else {
-            log.warn "Failed to get datasources: Status code: $statusCode -- ${body}"
-        }
-        return info
+        return responseWrapper.parsedInfo
     }
 
 
@@ -787,18 +719,9 @@ class FusionClient {
         url = "$fusionBase/api/connectors/plugins"
         log.info "getting all installed connectors"
         HttpRequest request = buildGetRequest(url)
+        FusionResponseWrapper responseWrapper = sendFusionRequest(request)
 
-        response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-        int statusCode = response.statusCode()
-        String body = response.body()
-        def info = null
-        if (isSuccessResponse(response)) {
-            info = new JsonSlurper().parseText(body)
-            log.info("\t\t get datasources response: ${response.statusCode()}")
-        } else {
-            log.warn "Failed to get datasources: Status code: $statusCode -- ${body}"
-        }
-        return info
+        return responseWrapper.parsedInfo
     }
 
 
@@ -816,16 +739,8 @@ class FusionClient {
             String url = "$fusionBase/api/connectors/plugins?id=${connectorId}"
             log.info "\t install connector plugin ($connectorId) from repository with url: $url"
             HttpRequest request = buildPostRequest(url, jsonToIndex)
-
-            response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-            int statusCode = response.statusCode()
-            if (isSuccessResponse(response)) {
-                log.info("\t\t install CONNECTOR plugin (${connectorId}) -- response($response)")
-            } else {
-                String body = response.body()
-                log.warn "Failed to install CONNECTOR plugin (${connectorId}) -- : ${response}"
-            }
-
+            FusionResponseWrapper responseWrapper = sendFusionRequest(request)
+            response = responseWrapper.response
         } catch (IllegalArgumentException iae) {
             log.error "IllegalArgumentException creating datasources($connectorId): $iae"
         }
@@ -839,18 +754,9 @@ class FusionClient {
         String url = "$fusionBase/api/connectors/datasources"
         log.info "No app given, getting all datasources"
         HttpRequest request = buildGetRequest(url)
+        FusionResponseWrapper responseWrapper = sendFusionRequest(request)
 
-        response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-        int statusCode = response.statusCode()
-        String body = response.body()
-        def info = null
-        if (isSuccessResponse(response)) {
-            info = new JsonSlurper().parseText(body)
-            log.info("\t\t get datasources response: ${response.statusCode()}")
-        } else {
-            log.warn "Failed to get datasources: Status code: $statusCode -- ${body}"
-        }
-        return info
+        return responseWrapper.parsedInfo
     }
 
 
@@ -859,9 +765,8 @@ class FusionClient {
         String url = "$fusionBase/api/apps/${appName}/connectors/datasources"
         log.info "app (${appName}) given, getting all datasources"
         HttpRequest request = buildGetRequest(url)
-        FusionResponseWrapper fusionResponse = sendFusionRequest(request)
-        responses<< fusionResponse
-        return fusionResponse.parsedInfo
+        FusionResponseWrapper responseWrapper = sendFusionRequest(request)
+        return responseWrapper.parsedInfo
     }
 
 
