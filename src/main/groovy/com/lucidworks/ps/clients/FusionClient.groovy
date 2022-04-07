@@ -12,6 +12,7 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.nio.file.Path
 import java.time.Duration
+
 /**
  * attempt to replicate solrj client-ness for fusion
  * using cookies and session api to start with
@@ -29,25 +30,24 @@ import java.time.Duration
  */
 class FusionClient {
     protected static Logger log = Logger.getLogger(this.class.name)
-    String user= null
-    String password= null
+    String user = null
+    String password = null
 
-    String fusionBase= null
-    HttpClient httpClient= null
-    private String sessionCookie= null
+    String fusionBase = null
+    HttpClient httpClient = null
+    private String sessionCookie = null
     File objectsJsonFile = null
     File exportDirectory = null
     String objectsGroup = null
-    Map introspectInfo= null
-    Map apiInfo= null
-    Long cookieMS= null
+    Map introspectInfo = null
+    Map apiInfo = null
+    Long cookieMS = null
     long MAX_COOKIE_AGE_MS = 1000 * 60 * 15                     // starting with default of 15 minutes for cookie age?   todo -- revisit, make this more accessible
     List<FusionResponseWrapper> responses = []                  // todo -- look at potential OOM issues for long running client
 
     FusionClient(String baseUrl, String user, String pass) {
         this(new URL(baseUrl), user, pass)
     }
-
 
     FusionClient(URL baseUrl, String user, String pass) {
         this.fusionBase = baseUrl
@@ -63,13 +63,13 @@ class FusionClient {
         httpClient = buildClient(fusionBase, user, password)
     }
 
-    FusionClient(OptionAccessor options){
+    FusionClient(OptionAccessor options) {
         fusionBase = options.f
         user = options.u                            // fusion username for destination of new/migrated app
         password = options.p
         String srcObjectJsonPath = options.s                // todo -- add logic to read configs from live fusion (needs source: url, pass, furl, appname)
         objectsJsonFile = new File(srcObjectJsonPath)
-        if(objectsJsonFile.isFile() && objectsJsonFile.exists()){
+        if (objectsJsonFile.isFile() && objectsJsonFile.exists()) {
             log.info "Source file exists: ${objectsJsonFile.absolutePath}"
         } else {
             log.warn "Source file exists: ${objectsJsonFile.absolutePath} does NOT EXIST..."
@@ -77,19 +77,19 @@ class FusionClient {
 
         objectsGroup = options.g
         String x = options.x ?: null
-        if(x){
+        if (x) {
             exportDirectory = new File(x)
-            if(exportDirectory.exists()){
-              if(exportDirectory.isDirectory()) {
-                  log.debug "Got reasonable export dir: ${exportDirectory.absolutePath}"
-              } else {
-                  String msg = "Export directory not a directory: ${exportDirectory.absolutePath}"
-                  log.error msg
-                  throw new IllegalArgumentException(msg)
-              }
+            if (exportDirectory.exists()) {
+                if (exportDirectory.isDirectory()) {
+                    log.debug "Got reasonable export dir: ${exportDirectory.absolutePath}"
+                } else {
+                    String msg = "Export directory not a directory: ${exportDirectory.absolutePath}"
+                    log.error msg
+                    throw new IllegalArgumentException(msg)
+                }
             } else {
                 exportDirectory = new File(exportDir)
-                if(exportDirectory.mkdir()){
+                if (exportDirectory.mkdir()) {
                     log.warn "Export dir($exportDir) did not exist, but we were able to make it (one child deep): ${exportDirectory.absolutePath}"
                 }
             }
@@ -108,14 +108,13 @@ class FusionClient {
     }
 
 
-
-/**
- * Get a JDK HttpClient with some defaults set for convenience
- * @param baseUrl
- * @param user
- * @param pass
- * @return
- */
+    /**
+     * Get a JDK HttpClient with some defaults set for convenience
+     * @param baseUrl
+     * @param user
+     * @param pass
+     * @return
+     */
     HttpClient buildClient(String baseUrl, String user, String pass) {
         log.info "\t${this.class.simpleName} getClient(baseurl: $baseUrl, user:$user, password <hidden>...)   [should only need to call this once...]"
         HttpClient client = HttpClient.newBuilder()
@@ -130,21 +129,21 @@ class FusionClient {
         log.info "\tInitializing Fusion client session via POST to session url: $urlSession"
 
 //        try {
-            HttpRequest request = buildPostRequest(urlSession, authJson)
+        HttpRequest request = buildPostRequest(urlSession, authJson)
 
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString())
-            FusionResponseWrapper fusionResponseWrapper = new FusionResponseWrapper(request,response)
-            responses << fusionResponseWrapper
-            if(response.statusCode() < 300 ) {
-                log.debug("\t\tResponse status: " + response.statusCode())
-                sessionCookie = response.headers().firstValue("set-cookie")
-                cookieMS = System.currentTimeMillis()
-                Date ts = new Date(cookieMS)
-                log.info("\tSession cookie: ${this.sessionCookie} set/refreshed at timestamp: $cookieMS (${ts})")
-            } else {
-                log.error "Bad status code creating client (incorrect auth??), Status Code: ${response.statusCode()} -- body: ${response.body()}"
-                throw new AuthenticationException("Could not create Fusion Client (${response.body()})")
-            }
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString())
+        FusionResponseWrapper fusionResponseWrapper = new FusionResponseWrapper(request, response)
+        responses << fusionResponseWrapper
+        if (response.statusCode() < 300) {
+            log.debug("\t\tResponse status: " + response.statusCode())
+            sessionCookie = response.headers().firstValue("set-cookie")
+            cookieMS = System.currentTimeMillis()
+            Date ts = new Date(cookieMS)
+            log.info("\tSession cookie: ${this.sessionCookie} set/refreshed at timestamp: $cookieMS (${ts})")
+        } else {
+            log.error "Bad status code creating client (incorrect auth??), Status Code: ${response.statusCode()} -- body: ${response.body()}"
+            throw new AuthenticationException("Could not create Fusion Client (${response.body()})")
+        }
 //        } catch (Exception e) {
 //            log.warn "Problem getting client: $e"
 //            client = null
@@ -166,6 +165,26 @@ class FusionClient {
         FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
         List<Map<String, Object>> applications = fusionResponseWrapper.parsedInfo
         return applications
+    }
+
+    FusionResponseWrapper addAppIfMissing(Map appMap) {
+        String appName = appMap.name
+        log.info "Add app if missing: $appName"
+        // --------------- Create Application ------------------
+        Map appDefinition = [id          : appMap.id,
+                             name        : appName,
+                             description : "${appMap.description}\n Automigrated by LW UpVal utility -- ${new Date()}",
+                             "properties": [headerImageName: appMap.properties.headerImageName, tileColor: appMap.properties.tileColor]]
+        boolean relatedObjects = true
+        List<Map<String, Object>> existingApps = getApplications()
+        def currentApp = existingApps.find { it.name == appName }
+        FusionResponseWrapper fusionResponseWrapper = null
+        if (currentApp) {
+            log.info "Found existing app: $currentApp"
+        } else {
+            fusionResponseWrapper = createApplication(appDefinition, relatedObjects)
+        }
+        return fusionResponseWrapper
     }
 
 
@@ -575,33 +594,31 @@ class FusionClient {
         String jsonToIndex = jsonBuilder.toString()
         String id = properties.id
         String name = properties.name
-        def info = null
+        FusionResponseWrapper fusionResponseWrapper = null
         try {
             String url = "$fusionBase/api/apps"
             log.info "\t Create APP ($name) url: $url -- Json text size::\t ${jsonToIndex.size()} with object id: $id"
             HttpRequest request = buildPostRequest(url, jsonToIndex)
 
-            info = sendFusionRequest(request)
+            fusionResponseWrapper = sendFusionRequest(request)
             log.info "Created app? $info"
         } catch (Exception e) {
             log.error "Error: $e"
         }
+        return fusionResponseWrapper
     }
 
     public FusionResponseWrapper sendFusionRequest(HttpRequest request) {
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-        FusionResponseWrapper fusionResponse = new FusionResponseWrapper(request,response)
+        FusionResponseWrapper fusionResponse = new FusionResponseWrapper(request, response)
         return fusionResponse
     }
 
-    List<Map> getCollections(String appName) {
-        HttpResponse<String> response = null
+    List<Map<String, Object>> getCollections(String appName) {
         String url = "$fusionBase/api/apps/${appName}/collections"
-        log.info "\t list collections for app $appName url: $url "
+        log.info "List collections for app $appName url: $url "
         HttpRequest request = buildGetRequest(url)
-
         FusionResponseWrapper responseWrapper = sendFusionRequest(request)
-
         return responseWrapper.parsedInfo
     }
 
@@ -613,8 +630,8 @@ class FusionClient {
      * @param defaultFeatures (set to false, since user is likely to create an app, which would have primary coll with default features) --here we assume supporting collections
      * @return
      */
-    def createCollection(Map<String, Object> collection, String appName, boolean defaultFeatures = false) {
-        HttpResponse<String> collectionResponse = null
+    FusionResponseWrapper createCollection(Map<String, Object> collection, String appName, boolean defaultFeatures = false) {
+        FusionResponseWrapper responseWrapper = null
         String collName = collection.id
         JsonBuilder jsonBuilder = new JsonBuilder([id: collName])
         String jsonToIndex = jsonBuilder.toString()
@@ -622,23 +639,19 @@ class FusionClient {
             String url = "$fusionBase/api/apps/${appName}/collections"      // todo: add defaultFeatures?
             log.info "\t Create COLLECTION ($collName) url: $url -- Json text size::\t ${jsonToIndex.size()}"
             HttpRequest request = buildPostRequest(url, jsonToIndex)
-
-            FusionResponseWrapper responseWrapper = sendFusionRequest(request)
-
-            collectionResponse = responseWrapper.response
-
+            responseWrapper = sendFusionRequest(request)
         } catch (IllegalArgumentException iae) {
             log.error "IllegalArgumentException: $iae"
         }
 
-        return collectionResponse
+        return responseWrapper
     }
 
     List getParsers(String appName) {
         HttpResponse<String> response = null
         String url = "$fusionBase/api/parsers"
         log.info "\t list parsers for url: $url "
-        HttpRequest  request = buildGetRequest(url)
+        HttpRequest request = buildGetRequest(url)
 
         FusionResponseWrapper responseWrapper = sendFusionRequest(request)
 
@@ -706,7 +719,7 @@ class FusionClient {
 
     Object getConnectorsRepository() {
         String url = "$fusionBase/connectors/repository"
-        log.info "getting all available connectors"
+        log.info "getting all ...available... connectors"
         HttpRequest request = buildGetRequest(url)
         FusionResponseWrapper responseWrapper = sendFusionRequest(request)
 
@@ -726,31 +739,39 @@ class FusionClient {
     }
 
 
-    Object getConnectorsUsed(Map objectsMap) {
-        def dataSources = objectsMap['dataSources']
-        def connectorsGrouped = dataSources.groupBy { Map ds ->
-            ds.connector
-        }
-        return connectorsGrouped
+    /**
+     * scan the source/exported objects info, and find all the connector plugins
+     * <br>
+     * <i>Note:(making this a simple function to be able to expand/override in the future</i>
+     * @param objectsMap
+     * @return
+     */
+    List<Map<String, Object>> getConnectorsUsed(Map objectsMap) {
+        List<Map<String, Object>> dataSources = objectsMap['dataSources']
     }
 
-    HttpResponse<String> installConnector(String connectorId) {
-        HttpResponse<String> response = null
+
+    /**
+     * add the connector from the F5+ repository to destination fusion
+     * @param connectorId
+     * @return
+     */
+    FusionResponseWrapper installConnectorFromRepository(String connectorId) {
+        FusionResponseWrapper responseWrapper = null
         try {
             String url = "$fusionBase/api/connectors/plugins?id=${connectorId}"
             log.info "\t install connector plugin ($connectorId) from repository with url: $url"
             HttpRequest request = buildPostRequest(url, jsonToIndex)
-            FusionResponseWrapper responseWrapper = sendFusionRequest(request)
-            response = responseWrapper.response
+            responseWrapper = sendFusionRequest(request)
         } catch (IllegalArgumentException iae) {
             log.error "IllegalArgumentException creating datasources($connectorId): $iae"
         }
 
-        return response
+        return responseWrapper
     }
 
 
-    Object getDataSources() {
+    List<Map<String, Object>> getDataSources() {
         HttpResponse<String> response = null
         String url = "$fusionBase/api/connectors/datasources"
         log.info "No app given, getting all datasources"
@@ -771,77 +792,37 @@ class FusionClient {
     }
 
 
-    def createDataSource(Map<String, Object> map, String app) {
-        HttpResponse<String> response = null
-        JsonBuilder jsonBuilder = new JsonBuilder(map)
-        String name = map.id
-        String jsonToIndex = jsonBuilder.toString()
-        String connector = map.connector
-        try {
-            String url = "$fusionBase/api/apps/${app}/connectors/datasources"
-            log.info "\t Create DATASOURCES ($name) type($connector) url: $url -- Json text size::\t ${jsonToIndex.size()}"
-            HttpRequest request = buildPostRequest(url, jsonToIndex)
-
-            response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-            int statusCode = response.statusCode()
-            if (isSuccessResponse(response)) {
-                log.info("\t\t Create DATASOURCES response($name): ${response.statusCode()}")
-            } else {
-                String body = response.body()
-                String type = map.type
-                log.warn "Failed to create DATASOURCES (type:$type): $name? Status code: $statusCode \n\t\t object map: $map}"
-            }
-
-        } catch (IllegalArgumentException iae) {
-            log.error "IllegalArgumentException creating datasources($name): $iae"
-        }
-
-        // todo convert over to FusionResponseWrapper ??
-        return response
+    FusionResponseWrapper createDataSource(Map<String, Object> map, String app) {
+        String jsonToIndex = new JsonBuilder(map).toString()
+        String url = "$fusionBase/api/apps/${app}/connectors/datasources"
+        log.info "\t Create DATASOURCES (${map.id}) type(${map.connector}) url: $url -- Json text size::\t ${jsonToIndex.size()}"
+        HttpRequest request = buildPostRequest(url, jsonToIndex)
+        FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
     }
 
     List<Map<String, String>> getLinks() {
-        HttpResponse<String> response = null
         String url = "$fusionBase/api/links"
         HttpRequest request = buildGetRequest(url)
-
-        response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-        int statusCode = response.statusCode()
-        String body = response.body()
-        def info = null
-        if (isSuccessResponse(response)) {
-            info = new JsonSlurper().parseText(body)
-            log.info("\t\t get links response: ${response.statusCode()}")
+        FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
+        if (fusionResponseWrapper.wasSuccess()) {
+            return fusionResponseWrapper.parsedInfo
         } else {
-            log.warn "Failed to get links: Status code: $statusCode -- ${body}"
+            log.warn "Faled to get Object links!!?! Response wrapper: $fusionResponseWrapper"
         }
-        return info
+        return null     // todo -- consider refactoring to return FusionResponseWrapper like other calls...
     }
 
-    HttpResponse<String> createLink(Map<String, Object> map, String app) {
+    FusionResponseWrapper createLink(Map<String, Object> map, String app) {
         HttpResponse<String> response = null
-        String name = "${map.subject}:${map.object}::${map.linkType}"
         JsonBuilder jsonBuilder = new JsonBuilder(map)
         String jsonToIndex = jsonBuilder.toString()
-        try {
-            String url = "$fusionBase/api/links"
-            log.info "\t Create LINK ($name)  url: $url -- Json text size::\t ${jsonToIndex.size()}"
-            HttpRequest request = buildPutRequest(url, jsonToIndex)
+        String url = "$fusionBase/api/links"
+        String name = "sub:${map.subject}    obj:${map.object}    type:${map.linkType}"
+        log.info "\t Create LINK ($name)  url: $url -- Json text size::\t ${jsonToIndex.size()}"
+        HttpRequest request = buildPutRequest(url, jsonToIndex)
+        FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
 
-            response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-            int statusCode = response.statusCode()
-            if (isSuccessResponse(response)) {
-                log.info("\t\t Create LINK response($name): ${response.statusCode()}")
-            } else {
-                String body = response.body()
-                log.warn "Failed to create LINK: $name? Status code: $statusCode "
-            }
-
-        } catch (IllegalArgumentException iae) {
-            log.error "IllegalArgumentException creating LINK($name): $iae"
-        }
-
-        return response
+        return fusionResponseWrapper
     }
 
     HttpRequest buildPutRequest(String url, String jsonToIndex) {
@@ -879,4 +860,145 @@ class FusionClient {
     }
 
 
+    /**
+     * Scan source objects map, load existing connector plugins from Destination fusion, and if F5, ask about the repository
+     * add any plugins needed based on those in source DataSoources/connectors-used
+     * @param srcFusionObjects
+     * @return
+     */
+    Map<String, List<Object>> addConnectorPluginsIfMissing(Map srcFusionObjects) {
+        log.info "Installed Connectors: ${connectorsInstalled.size()}"
+        Map connectorStatus = [used: [], installed: [], repository: [], ready: [], added: [], missing: [], remapped: []]
+        List<Map<String, String>> connectorsInstalled = getConnectorsInstalled()
+        log.debug "\t\t Connectors installed: $connectorsInstalled"
+        connectorStatus.installed = connectorsInstalled
+
+        List<Map<String, String>> connectorsRepository = getConnectorsRepository()
+        connectorStatus.repository = connectorsRepository
+        log.info "Repository Connectors: ${connectorsRepository.size()}"
+
+        List<Map<String, Object>> connectorsUsed = getConnectorsUsed(srcFusionObjects)
+        connectorStatus.used = connectorsUsed
+        log.info "\t\tUsed Connectors: ${connectorsUsed.size()}"
+        Map usedConnectorsByType = connectorsUsed.groupBy { it.type }
+        usedConnectorsByType.each { String type, List<Map<String, Object>> usedDataSources ->
+            Map usedDatasourcesByConnector = usedDataSources.groupBy { it.connector }      // have to handle fubar mixup between 'connector' value from export and 'type' value in api call
+            if (usedDatasourcesByConnector.size() > 1) {
+                log.info "More than one source Datasource connector for type ($type) -- used connectors: $usedConnectorsByType???"
+            }
+            log.debug "\t\tUsed: '$type' with (${usedDataSources.size()}) datasources "
+            List<Map<String, String>> installedMatches = connectorsInstalled.findAll {
+                it.type.containsIgnoreCase(type)
+            }
+            if (installedMatches) {
+                if (installedMatches.size() > 1) {
+                    log.warn "More than one ready plugin match?? ($installedMatches)"
+                    // -- picking the first (${installedMatches[0]})"
+                }
+                Set dsKeys = usedDatasourcesByConnector.keySet()
+                String usedDsMatch = null
+                if (usedDatasourcesByConnector.size() == 1) {
+                    usedDsMatch = dsKeys[0]
+                    log.debug "one datasource type: ${usedDsMatch}"
+                    if (usedDsMatch.equalsIgnoreCase(installedMatches.type)) {
+                        log.info "\t\tdirect match on type: ready:$installedMatches --  dskeys:$dsKeys"
+                        connectorStatus.ready << installedMatches
+                    } else {
+                        log.warn "no direct match, what to do here?? ready:$installedMatches --  dskeys:$dsKeys"
+                        connectorStatus.remapped << [source: installedMatches, destination: usedDsMatch]
+                    }
+                } else {
+                    log.warn "More than one datasource plugin type?? ready:$installedMatches --  dskeys:$dsKeys"
+                }
+                Map<String, String> match = installedMatches[0]
+                connectorStatus.ready << match
+                String readyType = match.type
+                if (usedDsMatch.equalsIgnoreCase(readyType)) {
+                    log.info "\t\tFound connector used: ($type) is already installed and has (${usedDataSources.size()}) datasources using it"
+                } else {
+                    log.warn "\t\tFound connector used: ($usedDsMatch) but it seems to map to new type: ($readyType), watch datasource mapping/change..."
+                }
+            } else {
+                def repo = connectorsRepository.find { it.id == type }
+                if (repo) {
+                    log.warn "Found connector used: ($type) with (${usedDataSources.size()}) datasources NOT installed, but IS IN the repo, so install it..."
+                    FusionResponseWrapper responseWrapper = installConnectorFromRepository(type)
+                    if (responseWrapper.wasSuccess()) {
+                        connectorStatus.added << repo
+                    } else {
+                        connectorStatus.missing << repo
+                        log.info "Could not add repository plugin?? $repo\n\t\tresponse wrapper: $responseWrapper"
+                    }
+                    log.info "Result of install connector: '$type': $responseWrapper"
+                } else {
+                    connectorStatus.missing.addAll(usedDataSources)
+                    log.warn "Connector used: ($type) with (${usedDataSources.size()}) datasources NOT INSTALLED, AND NOT in REPO!!! Panic?"
+                }
+            }
+        }
+        return connectorStatus
+    }
+
+    List<FusionResponseWrapper> addCollectionsIfMissing(String appName, Map srcFusionObjects) {
+        List<FusionResponseWrapper> responses = []
+        List<Map<String, Object>> existingCollections = getCollections(appName)
+
+        // --------------- Create Collections ------------------
+        srcFusionObjects['collections'].each { Map<String, Object> coll ->
+            String newCollname = coll.id
+            def existingColl = existingCollections.find { it.id == newCollname }
+            if (existingColl) {
+                log.info "\t\tSkipping existing collection ($newCollname)"
+                log.debug "\t\tSkipped existing collection ($newCollname): $existingColl"
+            } else {
+                boolean defaultFeatures = false
+                FusionResponseWrapper responseWrapper = createCollection(coll, appName, defaultFeatures)
+                if (responseWrapper.wasSuccess()) {
+                    log.info "Created Collection: ($coll)"
+                } else {
+                    log.warn "Had a problem creating collection: $coll??? Response wrapper: $responseWrapper"
+                }
+                responses << responseWrapper
+            }
+        }
+        return responses
+    }
+
+    List<FusionResponseWrapper> addDatasourcesIfMissing(String appName, Map srcFusionObjects, def oldLinks) {
+        List<FusionResponseWrapper> responses = []
+
+        List<Map<String, Object>> dsExisting = getDataSources()
+        // get map of existing links (faster lookups...?)
+        srcFusionObjects['dataSources'].each { Map<String, Object> p ->
+            String dsName = p.id
+            def existingDS = dsExisting.find {
+                it.id == dsName
+            }
+            if (existingDS) {
+                log.info "\tSKIPPING existing datasource: $dsName"
+            } else {
+                log.info "CREATE datasource: $dsName "
+                FusionResponseWrapper responseWrapper = createDataSource(p, appName)
+                responses << responseWrapper
+
+                if (responseWrapper.wasSuccess()) {
+                    // get the relevant links for this datasource (typically 3)
+                    def dsLinksImport = oldLinks.findAll {it.subject.startsWith("datasource:${dsName}") }
+                    dsLinksImport.each { Map m ->
+                        String subject = m.subject
+                        if (existingLinksMap[subject]) {
+                            log.info "\t\tSkipping existing data source link: $m"
+                        } else {
+                            FusionResponseWrapper responseWrapper2 = createLink(m, appName)
+                            log.info "\t\tCreate link result code: $responseWrapper2"
+                        }
+                    }
+                    log.info "\t\tDatasource links to import (or skip): ${dsLinksImport}"
+                } else {
+                    log.info "\t\tSkipping datasource links since we did not create "
+                }
+            }
+        }
+        return responses
+    }
 }
