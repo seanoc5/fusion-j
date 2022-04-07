@@ -1,8 +1,9 @@
 package com.lucidworks.ps.clients
 
-
+import groovy.cli.picocli.OptionAccessor
 import groovy.json.JsonBuilder
 import groovy.json.JsonSlurper
+import org.apache.http.auth.AuthenticationException
 import org.apache.http.client.utils.URIBuilder
 import org.apache.log4j.Logger
 
