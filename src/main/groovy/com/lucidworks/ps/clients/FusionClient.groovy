@@ -139,7 +139,7 @@ class FusionClient {
             sessionCookie = response.headers().firstValue("set-cookie")
             cookieMS = System.currentTimeMillis()
             Date ts = new Date(cookieMS)
-            log.info("\tSession cookie: ${this.sessionCookie} set/refreshed at timestamp: $cookieMS (${ts})")
+            log.debug("\tSession cookie: ${this.sessionCookie} set/refreshed at timestamp: $cookieMS (${ts})")
         } else {
             log.error "Bad status code creating client (incorrect auth??), Status Code: ${response.statusCode()} -- body: ${response.body()}"
             throw new AuthenticationException("Could not create Fusion Client (${response.body()})")
