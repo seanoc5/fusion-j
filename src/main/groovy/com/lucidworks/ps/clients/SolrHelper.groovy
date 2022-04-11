@@ -17,6 +17,7 @@ import org.apache.solr.common.SolrDocumentList
 import org.apache.solr.common.util.NamedList
 /**
  * LW pro-serv helper class to set standard and convenient solr access
+ * Low-priority -- possibly remove/deprecate...?
  */
 class SolrHelper {
     protected static Logger log = Logger.getLogger(this.class.name);
@@ -45,7 +46,7 @@ class SolrHelper {
      */
     static void main(String[] args) {
         String url = 'http://localhost:8983/solr'
-        String coll = 'vocabulary'
+        String coll = 'test'
         SolrHelper solrHelper = new SolrHelper(url, coll)
         SolrQuery sq = new SolrQuery('*:*')
         SolrResponse rsp = solrHelper.query(sq)
