@@ -45,10 +45,23 @@ class FusionClient {
     long MAX_COOKIE_AGE_MS = 1000 * 60 * 15                     // starting with default of 15 minutes for cookie age?   todo -- revisit, make this more accessible
     List<FusionResponseWrapper> responses = []                  // todo -- look at potential OOM issues for long running client
 
+    /**
+     * typical constructor with information on how to connect to a fusion (F4 or F5, possibly other versions) - convert String url to proper Java URL
+     * @param baseUrl   e.g. http://yourdemocluster.lucidworks.com:6764   (trailing slash will be removed if included)
+     * @param user
+     * @param pass
+     */
     FusionClient(String baseUrl, String user, String pass) {
         this(new URL(baseUrl), user, pass)
     }
 
+
+    /**
+     * typical constructor with information on how to connect to a fusion (F4 or F5, possibly other versions) - proper Java URL argument version
+     * @param baseUrl   e.g. http://yourdemocluster.lucidworks.com:6764   (trailing slash will be removed if included)
+     * @param user
+     * @param pass
+     */
     FusionClient(URL baseUrl, String user, String pass) {
         this.fusionBase = baseUrl
         this.user = user
@@ -63,14 +76,21 @@ class FusionClient {
         httpClient = buildClient(fusionBase, user, password)
     }
 
+
+    /**
+     * Build HttpClient based on CliBuilder parsed commandline options
+     * todo -- revisit this code/placement, likely this is the wrong place for this helper/shortcut config
+     * @param options
+     */
     FusionClient(OptionAccessor options) {
         fusionBase = options.f
         user = options.u                            // fusion username for destination of new/migrated app
         password = options.p
         String srcObjectJsonPath = options.s                // todo -- add logic to read configs from live fusion (needs source: url, pass, furl, appname)
-        objectsJsonFile = new File(srcObjectJsonPath)
-        if (objectsJsonFile.isFile() && objectsJsonFile.exists()) {
+        File srcFile = new File(srcObjectJsonPath)
+        if (srcFile.isFile() && srcFile.exists()) {
             log.info "Source file exists: ${objectsJsonFile.absolutePath}"
+            objectsJsonFile = srcFile
         } else {
             log.warn "Source file exists: ${objectsJsonFile.absolutePath} does NOT EXIST..."
         }
@@ -154,6 +174,57 @@ class FusionClient {
 
 
     /**
+     * encapsulate GET (introspect/export) requests
+     * @param url
+     * @return
+     */
+    HttpRequest buildGetRequest(String url) {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofMinutes(1))
+                .header("Content-Type", "application/json")
+                .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
+                .GET()
+                .build()
+        return request
+    }
+
+    /**
+     * encapsulate put (update/replace) requests
+     * @param url
+     * @param jsonToIndex
+     * @return
+     */
+    HttpRequest buildPutRequest(String url, String jsonToIndex) {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofMinutes(1))
+                .header("Content-Type", "application/json")
+                .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
+                .PUT(HttpRequest.BodyPublishers.ofString(jsonToIndex))
+                .build()
+        return request
+    }
+
+    /**
+     * encapsulate POST (create) requests
+     * @param url
+     * @param jsonToIndex
+     * @return
+     */
+    HttpRequest buildPostRequest(String url, String jsonToIndex) {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofMinutes(1))
+                .header("Content-Type", "application/json")
+                .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
+                .POST(HttpRequest.BodyPublishers.ofString(jsonToIndex))
+                .build()
+        return request
+    }
+
+
+    /**
      * Get json "list" of applications defined in the cluster. See also: export
      * @return
      */
@@ -167,6 +238,11 @@ class FusionClient {
         return applications
     }
 
+    /**
+     * Helper function that accepts a Map of applications in a source (older?) fusion, and gets a collection of existing applications, and adds any that are missing.
+     * @param appMap
+     * @return
+     */
     FusionResponseWrapper addAppIfMissing(Map appMap) {
         String appName = appMap.name
         log.info "Add app if missing: $appName"
@@ -238,7 +314,11 @@ class FusionClient {
 //        return "more to come RSN..."
 //    }
 
-
+    /**
+     * placeholder function to check for session validity (i.e. expired cookie?)
+     * todo -- more code and testing here
+     * @return
+     */
     boolean isValidFusionClient() {
         boolean valid = false
         if (httpClient && sessionCookie && cookieMS) {
@@ -300,10 +380,16 @@ class FusionClient {
         return docs
     }
 
+
+    /**
+     * helper function to process Fusion responses
+     * todo -- add other response formats, or other missing functionality...?
+     * @param response
+     * @return
+     */
     Map<String, Object> parseResponse(HttpResponse response) {
         String respStr = response.body()
         //todo -- parse other formats (xml...)
-//        def headers = res
         JsonSlurper jsonSlurper = new JsonSlurper()
         Map<String, Object> json = jsonSlurper.parseText(respStr)
         return json
@@ -328,7 +414,8 @@ class FusionClient {
      * default commit=false, allow solr autocommit to work it's magic
      * @return
      */
-/*
+
+    /*
     HttpResponse indexDocumentsByApplicationProfile(String application, String indexProfile, List<Map<String, Object>> docs, boolean commit) {
         String jsonToIndex = new JsonBuilder(docs).toString()
 
@@ -336,7 +423,7 @@ class FusionClient {
         //if(indexResponse.resp
         return indexResponse
     }
-*/
+    */
 
 
     /**
@@ -373,8 +460,18 @@ class FusionClient {
         return indexResponse
     }
 
-    HttpResponse indexContentByProfile(Collection collToIndex, String app, String idxprofile, boolean commit) {
-        String jsonToIndex = new JsonBuilder(collToIndex).toString()
+    /**
+     * Accept a java-collection of things to index, convert them to json/string,
+     * send them to string-based function to index with index PROFILE
+     *
+     * @param docsToIndex
+     * @param app
+     * @param idxprofile
+     * @param commit
+     * @return
+     */
+    HttpResponse indexContentByProfile(Collection docsToIndex, String app, String idxprofile, boolean commit) {
+        String jsonToIndex = new JsonBuilder(docsToIndex).toString()
         indexContentByProfile(jsonToIndex, app, idxprofile, commit)
     }
 
@@ -429,6 +526,11 @@ class FusionClient {
     }
 
 
+    /**
+     * helper function to process response
+     * @param response
+     * @return
+     */
     boolean isSuccessResponse(HttpResponse response) {
         int statusCode = response.statusCode()
         if (statusCode >= 200 && statusCode < 300) {
@@ -457,34 +559,35 @@ class FusionClient {
         }
     }
 
-    def useLuke() {
-//        oldmac:8764/api/solr/lucy/admin/luke
-        //        def rsp = query(fusionBase, application, collection, )
-//                URIBuilder ub = new URIBuilder("${baseUrl}/api/solr/$collection/");
-//                qparams.each { String name, def val ->
-//                    log.debug "\t\t Adding param: $name => $val"
-//                    ub.addParameter(name, "${val}")         // needs to be a string?
-//                }
-//                URI uri = URI.create(ub.toString())
-//                log.debug "\t\tprepared uri: $uri"
-//
-//                var request = HttpRequest.newBuilder()
-//                        .GET()
-//                        .uri(uri)
-//                        .build();
-//
-//                // todo -- any difference if we do not use String type/generic?
-//                HttpResponse<String> queryResponse = httpFusionClient.send(request, HttpResponse.BodyHandlers.ofString());
-//                log.debug "Query response: $queryResponse"
-//                return queryResponse
-//
+    /*    def useLuke() {
+        oldmac:8764/api/solr/lucy/admin/luke
+                def rsp = query(fusionBase, application, collection, )
+                URIBuilder ub = new URIBuilder("${baseUrl}/api/solr/$collection/");
+                qparams.each { String name, def val ->
+                    log.debug "\t\t Adding param: $name => $val"
+                    ub.addParameter(name, "${val}")         // needs to be a string?
+                }
+                URI uri = URI.create(ub.toString())
+                log.debug "\t\tprepared uri: $uri"
 
-    }
+                var request = HttpRequest.newBuilder()
+                        .GET()
+                        .uri(uri)
+                        .build();
+
+                // todo -- any difference if we do not use String type/generic?
+                HttpResponse<String> queryResponse = httpFusionClient.send(request, HttpResponse.BodyHandlers.ofString());
+                log.debug "Query response: $queryResponse"
+                return queryResponse
+
+
+    }*/
 
     /**
      * get all the terms for the current collection
      */
-/*
+
+    /*
     HttpResponse getTermsResponse(String collection, String field, int limitCount = 1000000, String regex = '[a-z]+') {
 //        def rsp = query(fusionBase, application, collection, )
 //        URIBuilder ub = new URIBuilder("${fusionBase}/solr/$collection/terms?terms.fl=${field}");
@@ -508,7 +611,14 @@ class FusionClient {
     }
 */
 
-    Map<String, Integer> parseTermsResponse(HttpResponse rsp) {
+    /**
+     * helper function to get terms from solr
+     * TODO allow incoming params rather than just the defaults here
+     * @param rsp
+     * @return
+     */
+
+    /*   Map<String, Integer> parseTermsResponse(HttpResponse rsp) {
         Map responseMap = parseResponse(rsp)
         def fieldList = responseMap.terms.keySet()
         Map<String, Map<String, Integer>> fieldsTermsMap = [:]
@@ -528,8 +638,16 @@ class FusionClient {
         }
         return fieldsTermsMap
     }
+*/
 
-
+    /**
+     * helper call to perform a delete by query
+     * Note: this can be expensive on the solr side, consider more performant options for production or anywhere performance matters
+     * @param collection
+     * @param deleteQuery
+     * @param commit
+     * @return
+     */
     HttpResponse deleteByQuery(String collection, String deleteQuery, boolean commit = false) {
         Map delCommand = [delete: [query: deleteQuery]]
         JsonBuilder jsonBuilder = new JsonBuilder(delCommand)
@@ -561,6 +679,13 @@ class FusionClient {
     }
 
 
+    /**
+     * call fusion rest api to get all the objects defined in fusion
+     *
+     * @param exportParams
+     * @param outputPath
+     * @return
+     */
     HttpResponse<Path> exportFusionObjects(String exportParams, Path outputPath) {
         String url = "$fusionBase/api/objects/export?${exportParams}"
         log.info "\t\tExport Fusion objects url: $url"
@@ -585,8 +710,15 @@ class FusionClient {
 
     /**
      * create an application
-     * TODO -- more code - implement
-     * @param properties
+     *
+     * @param properties definition of application details,
+     *
+     * e.g.
+     *
+     * Map appDefinition = [id          : appMap.id,
+     *                     name        : appName,
+     *                     description : "${appMap.description}\n Automigrated by LW UpVal utility -- ${new Date()}",
+     *                     "properties": [headerImageName: appMap.properties.headerImageName, tileColor: appMap.properties.tileColor]]
      */
     def createApplication(Map properties, boolean relatedObjects = true) {
         HttpResponse<String> response = null
@@ -608,12 +740,27 @@ class FusionClient {
         return fusionResponseWrapper
     }
 
+    /**
+     * helper function to send a request to fusion
+     * <p>
+     *     todo -- review any memory/resource issues with keeping these responses in memory, we assume this client is somewhat short-lived, and saving in memory should not be a problem...
+     * @param request object already built
+     * @link buildGetRequest
+     * @return the custom FusionResponseWrapper that will have the original request, the response, and some additional helper info/functionality
+     */
     public FusionResponseWrapper sendFusionRequest(HttpRequest request) {
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
         FusionResponseWrapper fusionResponse = new FusionResponseWrapper(request, response)
+
+        responses << fusionResponse         // add this response to the client's collection of responses
         return fusionResponse
     }
 
+    /**
+     * Get a list of existing collections in a given application
+     * @param appName
+     * @return
+     */
     List<Map<String, Object>> getCollections(String appName) {
         String url = "$fusionBase/api/apps/${appName}/collections"
         log.info "List collections for app $appName url: $url "
@@ -624,7 +771,8 @@ class FusionClient {
 
 
     /**
-     *
+     * Create a collection in the given fusion application.
+     * Note: the defaultFeatures controls things like signals sidecar collections, query rewrite, etc.
      * @param collection
      * @param appName
      * @param defaultFeatures (set to false, since user is likely to create an app, which would have primary coll with default features) --here we assume supporting collections
@@ -647,6 +795,12 @@ class FusionClient {
         return responseWrapper
     }
 
+    /**
+     * get a list of 'known' parsers in the Fusion deployment
+     *
+     * @param appName
+     * @return
+     */
     List getParsers(String appName) {
         HttpResponse<String> response = null
         String url = "$fusionBase/api/parsers"
@@ -658,6 +812,13 @@ class FusionClient {
         return responseWrapper.parsedInfo
     }
 
+    /**
+     * Create a parser object to be used during indexing (i.e. the parser for a given connector)
+     *
+     * @param map
+     * @param app
+     * @return
+     */
     def createParser(Map<String, Object> map, String app) {
         HttpResponse<String> response = null
         JsonBuilder jsonBuilder = new JsonBuilder(map)
@@ -679,6 +840,11 @@ class FusionClient {
         return response
     }
 
+    /**
+     * get a list index pipelines already defined/existing in the (destination/F5) Fusion deployment
+     * @param app
+     * @return
+     */
     Object getIndexPipelines(String app) {
         HttpResponse<String> response = null
         String url = null
@@ -695,6 +861,12 @@ class FusionClient {
         return responseWrapper.parsedInfo
     }
 
+    /**
+     * create and index pipeline by converting map object to json payload including destination application to connect it to
+     * @param map
+     * @param app
+     * @return
+     */
     def createIndexPipeline(Map<String, Object> map, String app) {
         HttpResponse<String> response = null
         JsonBuilder jsonBuilder = new JsonBuilder(map)
@@ -717,7 +889,14 @@ class FusionClient {
     }
 
 
-    Object getConnectorsRepository() {
+    /**
+     * get a list of connector plugins availble in the Lucidworks plugin repository
+     * some of these may already be installed.
+     *
+     * see also: https://plugins.lucidworks.com/
+     * @return
+     */
+    List<Map<String, String>> getConnectorsRepository() {
         String url = "$fusionBase/connectors/repository"
         log.info "getting all ...available... connectors"
         HttpRequest request = buildGetRequest(url)
@@ -727,7 +906,11 @@ class FusionClient {
     }
 
 
-    Object getConnectorsInstalled() {
+    /**
+     * Get a list of connectors that are already installed in the Fusion deployment
+     * @return
+     */
+    List<Map<String, String>> getConnectorsInstalled() {
         HttpResponse<String> response = null
         String url = null
         url = "$fusionBase/api/connectors/plugins"
@@ -771,6 +954,10 @@ class FusionClient {
     }
 
 
+    /**
+     * get a list of datasources defined in the fusion cluster
+     * @return
+     */
     List<Map<String, Object>> getDataSources() {
         HttpResponse<String> response = null
         String url = "$fusionBase/api/connectors/datasources"
@@ -823,40 +1010,6 @@ class FusionClient {
         FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
 
         return fusionResponseWrapper
-    }
-
-    HttpRequest buildPutRequest(String url, String jsonToIndex) {
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofMinutes(1))
-                .header("Content-Type", "application/json")
-                .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
-                .PUT(HttpRequest.BodyPublishers.ofString(jsonToIndex))
-                .build()
-        return request
-    }
-
-
-    HttpRequest buildGetRequest(String url) {
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofMinutes(1))
-                .header("Content-Type", "application/json")
-                .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
-                .GET()
-                .build()
-        return request
-    }
-
-    HttpRequest buildPostRequest(String url, String jsonToIndex) {
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofMinutes(1))
-                .header("Content-Type", "application/json")
-                .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
-                .POST(HttpRequest.BodyPublishers.ofString(jsonToIndex))
-                .build()
-        return request
     }
 
 
