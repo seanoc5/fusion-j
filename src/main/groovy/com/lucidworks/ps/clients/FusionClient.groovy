@@ -89,10 +89,10 @@ class FusionClient {
         String srcObjectJsonPath = options.s                // todo -- add logic to read configs from live fusion (needs source: url, pass, furl, appname)
         File srcFile = new File(srcObjectJsonPath)
         if (srcFile.isFile() && srcFile.exists()) {
-            log.info "Source file exists: ${objectsJsonFile.absolutePath}"
             objectsJsonFile = srcFile
+            log.info "Source file exists: ${objectsJsonFile.absolutePath}"
         } else {
-            log.warn "Source file exists: ${objectsJsonFile.absolutePath} does NOT EXIST..."
+            log.warn "Source file: ${srcFile.absolutePath} does NOT EXIST..."
         }
 
         objectsGroup = options.g
@@ -689,7 +689,7 @@ class FusionClient {
     HttpResponse<Path> exportFusionObjects(String exportParams, Path outputPath) {
         String url = "$fusionBase/api/objects/export?${exportParams}"
         log.info "\t\tExport Fusion objects url: $url"
-        HttpRequest collectionRequest = buildGetRequest(url)
+        HttpRequest request = buildGetRequest(url)
 
         HttpResponse<Path> fileResponse = null
         try {
@@ -721,7 +721,7 @@ class FusionClient {
      *                     "properties": [headerImageName: appMap.properties.headerImageName, tileColor: appMap.properties.tileColor]]
      */
     def createApplication(Map properties, boolean relatedObjects = true) {
-        HttpResponse<String> response = null
+//        HttpResponse<String> response = null
         JsonBuilder jsonBuilder = new JsonBuilder(properties)
         String jsonToIndex = jsonBuilder.toString()
         String id = properties.id
@@ -1032,9 +1032,9 @@ class FusionClient {
 
         List<Map<String, Object>> connectorsUsed = getConnectorsUsed(srcFusionObjects)
         connectorStatus.used = connectorsUsed
-        log.info "\t\tUsed Connectors: ${connectorsUsed.size()}"
-        Map usedConnectorsByType = connectorsUsed.groupBy { it.type }
-        usedConnectorsByType.each { String type, List<Map<String, Object>> usedDataSources ->
+        log.info "\t\tUsed Connectors: ${connectorsUsed?.size()}"
+        Map usedConnectorsByType = connectorsUsed?.groupBy { it.type }
+        usedConnectorsByType?.each { String type, List<Map<String, Object>> usedDataSources ->
             Map usedDatasourcesByConnector = usedDataSources.groupBy { it.connector }      // have to handle fubar mixup between 'connector' value from export and 'type' value in api call
             if (usedDatasourcesByConnector.size() > 1) {
                 log.info "More than one source Datasource connector for type ($type) -- used connectors: $usedConnectorsByType???"
@@ -1139,7 +1139,8 @@ class FusionClient {
                     def dsLinksImport = oldLinks.findAll {it.subject.startsWith("datasource:${dsName}") }
                     dsLinksImport.each { Map m ->
                         String subject = m.subject
-                        if (existingLinksMap[subject]) {
+//                        if (existingLinksMap[subject]) {
+                        if (dsExisting[subject]) {
                             log.info "\t\tSkipping existing data source link: $m"
                         } else {
                             FusionResponseWrapper responseWrapper2 = createLink(m, appName)
