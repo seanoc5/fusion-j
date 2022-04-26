@@ -42,12 +42,14 @@ class FusionClient {
     Map introspectInfo = null
     Map apiInfo = null
     Long cookieMS = null
-    long MAX_COOKIE_AGE_MS = 1000 * 60 * 15                     // starting with default of 15 minutes for cookie age?   todo -- revisit, make this more accessible
-    List<FusionResponseWrapper> responses = []                  // todo -- look at potential OOM issues for long running client
+    long MAX_COOKIE_AGE_MS = 1000 * 60 * 15
+    // starting with default of 15 minutes for cookie age?   todo -- revisit, make this more accessible
+    List<FusionResponseWrapper> responses = []
+    // todo -- look at potential OOM issues for long running client
 
     /**
      * typical constructor with information on how to connect to a fusion (F4 or F5, possibly other versions) - convert String url to proper Java URL
-     * @param baseUrl   e.g. http://yourdemocluster.lucidworks.com:6764   (trailing slash will be removed if included)
+     * @param baseUrl e.g. http://yourdemocluster.lucidworks.com:6764   (trailing slash will be removed if included)
      * @param user
      * @param pass
      */
@@ -58,7 +60,7 @@ class FusionClient {
 
     /**
      * typical constructor with information on how to connect to a fusion (F4 or F5, possibly other versions) - proper Java URL argument version
-     * @param baseUrl   e.g. http://yourdemocluster.lucidworks.com:6764   (trailing slash will be removed if included)
+     * @param baseUrl e.g. http://yourdemocluster.lucidworks.com:6764   (trailing slash will be removed if included)
      * @param user
      * @param pass
      */
@@ -86,7 +88,8 @@ class FusionClient {
         fusionBase = options.f
         user = options.u                            // fusion username for destination of new/migrated app
         password = options.p
-        String srcObjectJsonPath = options.s                // todo -- add logic to read configs from live fusion (needs source: url, pass, furl, appname)
+        String srcObjectJsonPath = options.s
+        // todo -- add logic to read configs from live fusion (needs source: url, pass, furl, appname)
         File srcFile = new File(srcObjectJsonPath)
         if (srcFile.isFile() && srcFile.exists()) {
             objectsJsonFile = srcFile
@@ -745,8 +748,7 @@ class FusionClient {
      * <p>
      *     todo -- review any memory/resource issues with keeping these responses in memory, we assume this client is somewhat short-lived, and saving in memory should not be a problem...
      * @param request object already built
-     * @link buildGetRequest
-     * @return the custom FusionResponseWrapper that will have the original request, the response, and some additional helper info/functionality
+     * @link buildGetRequest* @return the custom FusionResponseWrapper that will have the original request, the response, and some additional helper info/functionality
      */
     public FusionResponseWrapper sendFusionRequest(HttpRequest request) {
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
@@ -1136,7 +1138,7 @@ class FusionClient {
 
                 if (responseWrapper.wasSuccess()) {
                     // get the relevant links for this datasource (typically 3)
-                    def dsLinksImport = oldLinks.findAll {it.subject.startsWith("datasource:${dsName}") }
+                    def dsLinksImport = oldLinks.findAll { it.subject.startsWith("datasource:${dsName}") }
                     dsLinksImport.each { Map m ->
                         String subject = m.subject
 //                        if (existingLinksMap[subject]) {
@@ -1155,4 +1157,43 @@ class FusionClient {
         }
         return responses
     }
+
+    def getConfigSets() {
+        String url = "$fusionBase/api/solrAdmin/default/admin/configs?action=LIST"
+        // {{furl}}/api/solrAdmin/default/admin/configs?action=LIST
+        HttpRequest request = buildGetRequest(url)
+        FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
+        if (fusionResponseWrapper.wasSuccess()) {
+            List<String> configSets = fusionResponseWrapper.parsedMap.configSets
+            configSets.each{
+                log.debug "get configset: $it"
+
+            }
+            log.debug "Successfully got configsets (${configSets.size()}"
+        } else {
+            log.warn "Faled to get Object links!!?! Response wrapper: $fusionResponseWrapper"
+        }
+        return fusionResponseWrapper.parsedMap.configSets
+        // todo -- consider refactoring to return FusionResponseWrapper like other calls...
+    }
+
+    def getConfigSet() {
+        String url = "$fusionBase/api/solrAdmin/default/admin/configs?action=LIST&recursive=true"
+        // {{furl}}/api/solrAdmin/default/admin/configs?action=LIST
+        HttpRequest request = buildGetRequest(url)
+        FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
+        if (fusionResponseWrapper.wasSuccess()) {
+            List<String> configSets = fusionResponseWrapper.parsedMap.configSets
+            configSets.each{
+                log.debug "get configset: $it"
+
+            }
+            log.debug "Successfully got configsets (${configSets.size()}"
+        } else {
+            log.warn "Faled to get Object links!!?! Response wrapper: $fusionResponseWrapper"
+        }
+        return fusionResponseWrapper.parsedMap.configSets
+        // todo -- consider refactoring to return FusionResponseWrapper like other calls...
+    }
+
 }
