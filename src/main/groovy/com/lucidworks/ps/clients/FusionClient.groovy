@@ -12,7 +12,6 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.nio.file.Path
 import java.time.Duration
-
 /**
  * attempt to replicate solrj client-ness for fusion
  * using cookies and session api to start with
@@ -750,8 +749,8 @@ class FusionClient {
      * @param request object already built
      * @link buildGetRequest* @return the custom FusionResponseWrapper that will have the original request, the response, and some additional helper info/functionality
      */
-    public FusionResponseWrapper sendFusionRequest(HttpRequest request) {
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+    public FusionResponseWrapper sendFusionRequest(HttpRequest request, HttpResponse.BodyHandler bodyHandler=HttpResponse.BodyHandlers.ofString()) {
+        HttpResponse<String> response = httpClient.send(request, bodyHandler)
         FusionResponseWrapper fusionResponse = new FusionResponseWrapper(request, response)
 
         responses << fusionResponse         // add this response to the client's collection of responses
@@ -1182,6 +1181,24 @@ class FusionClient {
         // {{furl}}/api/solrAdmin/default/admin/configs?action=LIST
         HttpRequest request = buildGetRequest(url)
         FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
+        if (fusionResponseWrapper.wasSuccess()) {
+            List<String> configSets = fusionResponseWrapper.parsedMap.configSets
+            configSets.each{
+                log.debug "get configset: $it"
+
+            }
+            log.debug "Successfully got configsets (${configSets.size()}"
+        } else {
+            log.warn "Faled to get Object links!!?! Response wrapper: $fusionResponseWrapper"
+        }
+        return fusionResponseWrapper.parsedMap.configSets
+        // todo -- consider refactoring to return FusionResponseWrapper like other calls...
+    }
+    def getObjects(String params='', HttpResponse.BodyHandler bodyHandler){
+        String url = "$fusionBase/api/objects/export${params}"
+        // {{furl}}/api/solrAdmin/default/admin/configs?action=LIST
+        HttpRequest request = buildGetRequest(url)
+        FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request, bodyHandler)
         if (fusionResponseWrapper.wasSuccess()) {
             List<String> configSets = fusionResponseWrapper.parsedMap.configSets
             configSets.each{
