@@ -38,6 +38,10 @@ if (options.help) {
 FusionClient fusionClient = new FusionClient(options)
 Path tempPath = Paths.get("tempfile.zip")
 log.info "using temp file: ${tempPath.toAbsolutePath()}"
+def solrSchema = fusionClient.getSolrSchema("test")
+
+def solrConfigs = fusionClient.getSolrConfigList("test")
+log.info "Solr configs: $solrConfigs"
 HttpResponse.BodyHandler bodyHandler = HttpResponse.BodyHandlers.ofFile(tempPath)
 def objects = fusionClient.getObjects("", bodyHandler)
 def configSets = fusionClient.getConfigSets()
