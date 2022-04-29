@@ -1236,9 +1236,15 @@ class FusionClient {
         FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request, handler)
         if (fusionResponseWrapper.wasSuccess()) {
             List<Map<String, Object>> solrConfigs = fusionResponseWrapper.parsedList
-            List configThingsToGet = solrConfigs.collect { it.name }
+            def flattened = solrConfigs.flatten()
+            flattened.each {Map<String, Object> m ->
+                SolrConfigThing thing = new SolrConfigThing(m)
+                m.thing = thing
+                if(thing.value){
+                    log.debug "what now? $thing"
+                }
+            }
             for (int i = 0; i < solrConfigs.size(); i++) {
-
                 Map configEntry = solrConfigs[i]
                 log.debug "$i) Solr config: $configEntry"
                 String entryName = configEntry.name
