@@ -38,7 +38,7 @@ class SolrConfigThing {
             value = thingMap.value
             byte[] bytes = value.decodeBase64()
             decodedValue = new String(bytes)
-            parsedValue = parseValue()
+            parseValue()
             log.debug "\t\t solr config thing value(s): $decodedValue -> $parsedValue"
 
         } else {
@@ -64,11 +64,11 @@ class SolrConfigThing {
         } else if(name.endsWithIgnoreCase('txt')){
             valueType = TEXT
             parsedValue = decodedValue
-        } else if(name.endsWithIgnoreCase('xml') || name.equalsIgnoreCase('managed-schema')){
+        } else if(name.endsWithIgnoreCase('xml') || name.equalsIgnoreCase('managed-schema') || decodedValue.startsWith('<?')){
             valueType = XML
             XmlParser parser = new XmlParser()
             parsedValue = parser.parseText(decodedValue)
-            log.warn "\t\tMore code here: parseValue() with xml format? Name: $name..."
+            log.info "\t\t$name parseValue() with xml format? Name: $name..."
         } else {
             valueType = UNKNOWN
             parsedValue = decodedValue
