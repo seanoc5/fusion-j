@@ -29,6 +29,8 @@ class FusionResponseWrapper {
     def parsedInfo
     /** convenience prop for the response.statusCode */
     Integer statusCode
+    /** convenience access to result/message from call (useful for error summary) */
+    String statusMessage
      /** helper property to track timeline (roughly) -- time of this wrapper's creation, might potentially deviate from actual request time */
     Date timestamp
 
@@ -69,6 +71,7 @@ class FusionResponseWrapper {
                 log.info "No response text??? $fusionResponse"
             }
         } else {
+            statusMessage = response?.body()
             log.warn "Status: ${response.statusCode()} -- Not a successful request ($origRequest) -> response:($response)??  --body: ${response?.body()}"
         }
 
