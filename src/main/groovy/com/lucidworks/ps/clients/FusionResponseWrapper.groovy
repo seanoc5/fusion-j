@@ -68,10 +68,23 @@ class FusionResponseWrapper {
                 }
                 log.debug "parsed..."
             } else {
-                log.info "No response text??? $fusionResponse"
+                log.info "\t\tNo response text??? $fusionResponse"
             }
         } else {
-            statusMessage = response?.body()
+            def body = response?.body()
+            if(body instanceof String){
+                if(body.startsWith('{')){
+                    Map<String,Object> json = new JsonSlurper().parseText(body)
+                    if(json.type=='RESTError'){
+                        log.warn "Rest error (incorrect api path?): ${json.message} -- ${json.details} -- request url: ${origRequest.toString()}"
+                    } else {
+                        log.warn "Unknown request error: $json"
+                    }
+                    log.info "Error msg (json->map): $json"
+                } else {
+                    log.warn "Unknown response format (not json??). Response body: $body"
+                }
+            }
             log.warn "Status: ${response.statusCode()} -- Not a successful request ($origRequest) -> response:($response)??  --body: ${response?.body()}"
         }
 

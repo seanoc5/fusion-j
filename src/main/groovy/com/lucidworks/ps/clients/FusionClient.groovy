@@ -1,5 +1,6 @@
 package com.lucidworks.ps.clients
 
+import com.lucidworks.ps.solr.SolrConfigThing
 import groovy.cli.picocli.OptionAccessor
 import groovy.json.JsonBuilder
 import groovy.json.JsonSlurper
@@ -95,7 +96,7 @@ class FusionClient {
             objectsJsonFile = srcFile
             log.info "Source file exists: ${objectsJsonFile.absolutePath}"
         } else {
-            log.warn "Source file: ${srcFile.absolutePath} does NOT EXIST..."
+            log.debug "Source file: ${srcFile.absolutePath} does NOT EXIST..."
         }
 
         objectsGroup = options.g
@@ -149,7 +150,7 @@ class FusionClient {
         String authJson = """{"username":"$user", "password":"$pass"}"""
 
         String urlSession = "${baseUrl}/api/session"
-        log.info "\tInitializing Fusion client session via POST to session url: $urlSession"
+        log.info "\t\tInitializing Fusion client session via POST to session url: $urlSession"
 
 //        try {
         HttpRequest request = buildPostRequest(urlSession, authJson)
@@ -1217,40 +1218,45 @@ class FusionClient {
 
     /**
      * get a list of solr config 'things' -- placeholders that then need to be loaded individually
+     * note: {{furl}}/api/solrAdmin/default/admin/configs?action=LIST&recursive=true
      * @param collectionName
      * @param configObject
      * @param params
      * @param handler
      * @return list of entries in zookeeper (need to load each one, and possibly recursively for something like `lang`
      */
-    def getSolrConfigList(String collectionName, Map<String,String> params=[expand:'true', 'recursive':'true']) {
+    List<Map<String, Object>> getSolrConfigList(String collectionName, Map<String, String> params = [expand: 'true', 'recursive': 'true']) {
         String url = "$fusionBase/api/collections/${collectionName}/solr-config"
-        // {{furl}}/api/solrAdmin/default/admin/configs?action=LIST
+        if (params) {
+            url = "$url?${params.collect { "${it.key}=${it.value}" }.join('&')}"
+        }
+
         HttpRequest request = buildGetRequest(url)
         HttpResponse.BodyHandler handler = HttpResponse.BodyHandlers.ofString()
         FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request, handler)
         if (fusionResponseWrapper.wasSuccess()) {
             List<Map<String, Object>> solrConfigs = fusionResponseWrapper.parsedList
-            List configThingsToGet = solrConfigs.collect{it.name}
-            for (int i=0; i < solrConfigs.size(); i++){
-//            solrConfigs.each {Map it ->
-                Map configThing = solrConfigs[i]
-                log.debug "$i) Solr config: $configThing"
-                String thingName = configThing.name
-                if(configThing.value){
-                    String value = configThing.value
+            List configThingsToGet = solrConfigs.collect { it.name }
+            for (int i = 0; i < solrConfigs.size(); i++) {
+
+                Map configEntry = solrConfigs[i]
+                log.debug "$i) Solr config: $configEntry"
+                String entryName = configEntry.name
+                log.info "\t\tProcess solr config entry: $entryName"
+                if (configEntry.value) {
+                    String value = configEntry.value
                     def decodedValue = value.decodeBase64()
                 }
 
-                def foo = getSolrConfigThing(collectionName, thingName)
-                boolean isdir = configThing.isDir
-                log.debug "\t\tsub item: $configThing"
+                def foo = getSolrConfigThing(collectionName, entryName)
+                boolean isdir = configEntry.isDir
+                log.debug "\t\tsub item: $configEntry"
             }
             log.debug "Successfully got configsets (${solrConfigs.size()}"
         } else {
             log.warn "Faled to get Object links!!?! Response wrapper: $fusionResponseWrapper"
         }
-        return fusionResponseWrapper.parsedMap.configSets
+        return fusionResponseWrapper.parsedList
 
     }
 
@@ -1262,53 +1268,49 @@ class FusionClient {
      * @param params
      * @return
      */
-    def getSolrConfigThing(String collectionName, String configThingPath, Map<String,String> params=[expand:'true', 'recursive':'true']) {
+    SolrConfigThing getSolrConfigThing(String collectionName, String configThingPath, Map<String, String> params = [expand: 'true', 'recursive': 'true']) {
         String url = "$fusionBase/api/collections/${collectionName}/solr-config/${configThingPath}"
-        if(params){
-            url = "$url?${params.collect {"${it.key}=${it.value}"}.join('&')}"
+        if (params) {
+            url = "$url?${params.collect { "${it.key}=${it.value}" }.join('&')}"
         }
-        // {{furl}}/api/solrAdmin/default/admin/configs?action=LIST
+        SolrConfigThing thing = null
         HttpRequest request = buildGetRequest(url)
-        HttpResponse.BodyHandler handler = HttpResponse.BodyHandlers.ofString()
-        FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request, handler)
+        FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
         if (fusionResponseWrapper.wasSuccess()) {
-            List<Map<String, Object>> solrConfigs = fusionResponseWrapper.parsedList
-            solrConfigs.each {Map it ->
-                log.debug "Solr config: $it"
-                String thingName = it.name
-                boolean isdir = it.isDir
-                def foo = getSolrConfigList(collectionName, thingName)
-                log.debug "\t\tsub item: $it"
-            }
-            log.debug "Successfully got configsets (${solrConfigs.size()}"
+            thing = new SolrConfigThing(fusionResponseWrapper.parsedMap)
+            log.debug "Successfully got thing: (${thing}"
         } else {
             log.warn "Faled to get Object links!!?! Response wrapper: $fusionResponseWrapper"
         }
-        return fusionResponseWrapper.parsedMap.configSets
+        return thing
 
     }
-    def getSolrSchema(String collectionName, Map<String,String> params=[action:'LIST', wt:'json']) {
-        String url = "$fusionBase/api/objects.export?collection.ids=${collectionName}"
-        if(params){
-            url = "$url?${params.collect {"${it.key}=${it.value}"}.join('&')}"
+
+    /**
+     * use fusion passthrough api to get "combined" schema from Solr (includes overlay.json....)
+     * url format: {{furl}}/api/solr/{{coll}}/schema
+     * @param collectionName
+     * @param params
+     * @return
+     */
+    def getSolrSchema(String collectionName, Map<String, String> params = [action: 'LIST', wt: 'json']) {
+//        String url = "$fusionBase/api/objects/export?collection.ids=${collectionName}"
+        String url = "$fusionBase/api/solr/${collectionName}/schema"
+        if (params) {
+            url = "$url?${params.collect { "${it.key}=${it.value}" }.join('&')}"
         }
+        log.info "get solr (combined) schema via fusion pass-through api: $url"
         HttpRequest request = buildGetRequest(url)
         HttpResponse.BodyHandler handler = HttpResponse.BodyHandlers.ofString()
         FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request, handler)
+        Map schema = null
         if (fusionResponseWrapper.wasSuccess()) {
-            List<Map<String, Object>> solrConfigs = fusionResponseWrapper.parsedList
-            solrConfigs.each {Map it ->
-                log.debug "Solr config: $it"
-                String thingName = it.name
-                boolean isdir = it.isDir
-                def foo = getSolrConfigList(collectionName, thingName)
-                log.debug "\t\tsub item: $it"
-            }
-            log.debug "Successfully got configsets (${solrConfigs.size()}"
+            schema = fusionResponseWrapper.parsedMap.schema
+            log.debug "Successfully got schema (${schema}"
         } else {
             log.warn "Faled to get Object links!!?! Response wrapper: $fusionResponseWrapper"
         }
-        return fusionResponseWrapper.parsedMap.configSets
+        return schema
 
     }
 

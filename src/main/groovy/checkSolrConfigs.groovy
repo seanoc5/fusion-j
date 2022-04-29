@@ -34,15 +34,21 @@ if (options.help) {
     cli.usage()
     System.exit(0)
 }
-
+log.info "Setup fusion client..."
 FusionClient fusionClient = new FusionClient(options)
-Path tempPath = Paths.get("tempfile.zip")
-log.info "using temp file: ${tempPath.toAbsolutePath()}"
+
+log.info "\t\tcheck loading Solr Schema..."
 def solrSchema = fusionClient.getSolrSchema("test")
+def schemaOverview = solrSchema.collect {"${it.key}(${it.value instanceof Collection ? it.value.size() : it.value})"}
+log.info "\t\tgot schema with keys (and size): ${schemaOverview}"
 
 def solrConfigs = fusionClient.getSolrConfigList("test")
+
 log.info "Solr configs: $solrConfigs"
+Path tempPath = Paths.get("tempfile.zip")
 HttpResponse.BodyHandler bodyHandler = HttpResponse.BodyHandlers.ofFile(tempPath)
+log.info "\t\tusing temp file: ${tempPath.toAbsolutePath()}"
+
 def objects = fusionClient.getObjects("", bodyHandler)
 def configSets = fusionClient.getConfigSets()
 
