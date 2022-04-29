@@ -1244,20 +1244,6 @@ class FusionClient {
                     log.debug "what now? $thing"
                 }
             }
-            for (int i = 0; i < solrConfigs.size(); i++) {
-                Map configEntry = solrConfigs[i]
-                log.debug "$i) Solr config: $configEntry"
-                String entryName = configEntry.name
-                log.info "\t\tProcess solr config entry: $entryName"
-                if (configEntry.value) {
-                    String value = configEntry.value
-                    def decodedValue = value.decodeBase64()
-                }
-
-                def foo = getSolrConfigThing(collectionName, entryName)
-                boolean isdir = configEntry.isDir
-                log.debug "\t\tsub item: $configEntry"
-            }
             log.debug "Successfully got configsets (${solrConfigs.size()}"
         } else {
             log.warn "Faled to get Object links!!?! Response wrapper: $fusionResponseWrapper"
