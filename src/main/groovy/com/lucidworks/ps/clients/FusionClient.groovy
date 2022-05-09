@@ -1297,6 +1297,13 @@ class FusionClient {
         return responses
     }
 
+    /**
+     * Read existing job schedules, and add anything "missing" from source (exported objects only at the moment)
+     * @param appName
+     * @param srcJobsWithSchedules
+     * @param overwrite
+     * @return
+     */
     List<FusionResponseWrapper> addJobSchedulesIfMissing(String appName = '', List<Map<String, Object>> srcJobsWithSchedules, boolean overwrite=false) {
         log.info "addJobSchedulesIfMissing(app:$appName, srcJobsWithSchedules(${srcJobsWithSchedules.size()}):${srcJobsWithSchedules.collect { it.resource }}"
         List<FusionResponseWrapper> responses = []
