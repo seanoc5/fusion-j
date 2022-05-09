@@ -44,7 +44,7 @@ log.info "\t\tgot schema with keys (and size): ${schemaOverview}"
 
 def solrConfigs = fusionClient.getSolrConfigList("test")
 
-log.info "Solr configs: $solrConfigs"
+log.info "Solr configs, size:${solrConfigs.size()}"
 Path tempPath = Paths.get("tempfile.zip")
 HttpResponse.BodyHandler bodyHandler = HttpResponse.BodyHandlers.ofFile(tempPath)
 log.info "\t\tusing temp file: ${tempPath.toAbsolutePath()}"
