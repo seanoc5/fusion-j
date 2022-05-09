@@ -33,9 +33,10 @@ class FusionClient {
     protected static Logger log = Logger.getLogger(this.class.name)
     String user = null
     String password = null
-
     String fusionBase = null
+    String appName = null
     HttpClient httpClient = null
+
     private String sessionCookie = null
     File objectsJsonFile = null
     File exportDirectory = null
@@ -89,14 +90,23 @@ class FusionClient {
         fusionBase = options.f
         user = options.u                            // fusion username for destination of new/migrated app
         password = options.p
+        if (options.appName) {
+            appName = options.appName
+            log.info "given appname arg: $appName"
+        }
         String srcObjectJsonPath = options.s
-        // todo -- add logic to read configs from live fusion (needs source: url, pass, furl, appname)
-        File srcFile = new File(srcObjectJsonPath)
-        if (srcFile.isFile() && srcFile.exists()) {
-            objectsJsonFile = srcFile
-            log.info "Source file exists: ${objectsJsonFile.absolutePath}"
+        if (srcObjectJsonPath && !srcObjectJsonPath=='false') {
+            // todo -- add logic to read configs from live fusion (needs source: url, pass, furl, appname)
+            File srcFile = new File(srcObjectJsonPath)
+            if (srcFile.isFile() && srcFile.exists()) {
+                objectsJsonFile = srcFile
+                log.info "Source file exists: ${objectsJsonFile.absolutePath}"
+            } else {
+                log.warn "Source file: ${srcFile.absolutePath} does NOT EXIST..."
+                throw new IllegalArgumentException("Missing source file, param: $srcObjectJsonPath, but not a readable file (${srcFile.absolutePath})")
+            }
         } else {
-            log.debug "Source file: ${srcFile.absolutePath} does NOT EXIST..."
+            log.debug "No source file arg given (not reading app export, nor objects.json)... "
         }
 
         objectsGroup = options.g
@@ -121,6 +131,7 @@ class FusionClient {
 
         log.info """Initialized FusionClient with command line options:
             Fusion Url:     ${fusionBase}
+            App Name:       $appName
             Src json:       $objectsJsonFile
             User:           $user
             Password:       [redacted]
@@ -199,13 +210,22 @@ class FusionClient {
      * @param jsonToIndex
      * @return
      */
-    HttpRequest buildPutRequest(String url, String jsonToIndex) {
+    HttpRequest buildPutRequest(String url, def jsonToIndex) {
+        String json = null
+        if (jsonToIndex instanceof String) {
+            log.debug "Got a string, no json builder needed"
+            json = jsonToIndex
+        } else {
+            JsonBuilder jsonBuilder = new JsonBuilder(jsonToIndex)
+            json = jsonBuilder.toString()
+            log.debug "converted object($jsonToIndex) to Json string (${json}) for indexing"
+        }
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .timeout(Duration.ofMinutes(1))
                 .header("Content-Type", "application/json")
                 .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
-                .PUT(HttpRequest.BodyPublishers.ofString(jsonToIndex))
+                .PUT(HttpRequest.BodyPublishers.ofString(json))
                 .build()
         return request
     }
@@ -216,13 +236,22 @@ class FusionClient {
      * @param jsonToIndex
      * @return
      */
-    HttpRequest buildPostRequest(String url, String jsonToIndex) {
+    HttpRequest buildPostRequest(String url, def jsonToIndex) {
+        String json = null
+        if (jsonToIndex instanceof Collection) {
+            JsonBuilder jsonBuilder = new JsonBuilder(map)
+            json = jsonBuilder.toString()
+            log.debug "converted object($jsonToIndex) to Json string (${json}) for indexing"
+        } else {
+            json = jsonToIndex
+        }
+
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .timeout(Duration.ofMinutes(1))
                 .header("Content-Type", "application/json")
                 .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
-                .POST(HttpRequest.BodyPublishers.ofString(jsonToIndex))
+                .POST(HttpRequest.BodyPublishers.ofString(json))
                 .build()
         return request
     }
@@ -235,11 +264,21 @@ class FusionClient {
     List<Map<String, Object>> getApplications() {
         HttpResponse response = null
         String url = "$fusionBase/api/apps"
-        log.info "\t\tExport Fusion applications url: $url"
+        log.info "\t\tGet Fusion applications summary details via url: $url"
         HttpRequest request = buildGetRequest(url)
         FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
         List<Map<String, Object>> applications = fusionResponseWrapper.parsedInfo
         return applications
+    }
+
+  def getApplication(String appId) {
+        HttpResponse response = null
+        String url = "$fusionBase/api/apps/${appId}"
+        log.info "\t\tGet Fusion application ($appId) details via url: $url"
+        HttpRequest request = buildGetRequest(url)
+        FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
+        Map<String, Object> application = fusionResponseWrapper.parsedInfo
+        return application
     }
 
     /**
@@ -982,6 +1021,12 @@ class FusionClient {
     }
 
 
+    /**
+     * create fusion datasource: $fusionBase/api/apps/${app}/connectors/datasources
+     * @param map
+     * @param app
+     * @return
+     */
     FusionResponseWrapper createDataSource(Map<String, Object> map, String app) {
         String jsonToIndex = new JsonBuilder(map).toString()
         String url = "$fusionBase/api/apps/${app}/connectors/datasources"
@@ -990,6 +1035,11 @@ class FusionClient {
         FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
     }
 
+    /**
+     * Get existing links in Fusion deployment (api call)
+     * "$fusionBase/api/links"
+     * @return
+     */
     List<Map<String, String>> getLinks() {
         String url = "$fusionBase/api/links"
         HttpRequest request = buildGetRequest(url)
@@ -1002,6 +1052,108 @@ class FusionClient {
         return null     // todo -- consider refactoring to return FusionResponseWrapper like other calls...
     }
 
+    /**
+     * Get existing links in Fusion deployment (api call)
+     * "$fusionBase/api/links"
+     * @return
+     */
+    List<Map<String, String>> getJobs(String app = '', String jobType = '') {
+        def result = null
+        String url = "$fusionBase/api/"
+        if (app) url += "apps/${app}"
+        if (jobType) {
+            url += "/jobs?type=${jobType}"
+        } else {
+            url += "/jobs"
+        }
+        log.info "\t\tget jobs url (with app/jobType??): $url"
+
+        HttpRequest request = buildGetRequest(url)
+        FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
+        if (fusionResponseWrapper.wasSuccess()) {
+            result = fusionResponseWrapper.parsedInfo
+        } else {
+            log.warn "Faled to get Object links!!?! Response wrapper: $fusionResponseWrapper"
+        }
+        return result     // todo -- consider refactoring to return FusionResponseWrapper like other calls...
+    }
+
+    /**
+     * get the ?map? of job details
+     * (probably not a common call...?)
+     * @param resource
+     * @return parsed ?map?
+     */
+    Map<String, Object> getJob(String resource) {
+        def result = null
+        String url = "$fusionBase/api/jobs/$resource"
+        log.info "\t\tget job ($resource) with url : $url"
+        HttpRequest request = buildGetRequest(url)
+        FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
+        if (fusionResponseWrapper.wasSuccess()) {
+            result = fusionResponseWrapper.parsedInfo
+        } else {
+            log.warn "Faled to get Object links!!?! Response wrapper: $fusionResponseWrapper"
+        }
+        return result     // todo -- consider refactoring to return FusionResponseWrapper like other calls...
+    }
+
+
+    /**
+     * find the subset of jobs with 'nextStartTime', and then get get the schedule information
+     * @note this ia a bit of a hack, as Fusion does not seem to have a schedules list
+     * @param jobs
+     * @return
+     */
+    def getJobSchedules(List jobs = null) {
+        List result = []
+        if (!jobs) {
+            log.info "No jobs given as param to getJobSchedules, so we will all the jobs..."
+            jobs = getJobs()
+        }
+        def jobsWithSchedules = jobs.findAll { it.nextStartTime }
+        // assume if the job api returns a nextStartTime in the props, this has a schedule (and we need to grab details for each)
+        jobsWithSchedules.each {
+            log.debug "get schedule info for job: ${it.resource}"
+            def schedule = getJobSchedule(it.resource)
+            result << schedule
+        }
+//        HttpRequest request = buildGetRequest(url)
+//        FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
+//        if (fusionResponseWrapper.wasSuccess()) {
+//            result = fusionResponseWrapper.parsedInfo
+//        } else {
+//            log.warn "Faled to get Object links!!?! Response wrapper: $fusionResponseWrapper"
+//        }
+        return result
+    }
+
+    def getJobSchedule(String jobResourceName) {
+        String url = "$fusionBase/api/jobs/$jobResourceName/schedule"
+        def result
+        HttpRequest request = buildGetRequest(url)
+        FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
+        if (fusionResponseWrapper.wasSuccess()) {
+            result = fusionResponseWrapper.parsedInfo
+            if (result) {
+                log.debug "job schedule exists?? $result"
+            } else {
+                log.info "no job schedule exists?? $jobResourceName at api url: $url"
+            }
+        } else {
+            log.warn "Failed to get Job ($jobResourceName) schedule! Response wrapper: $fusionResponseWrapper"
+        }
+        return result     // todo -- consider refactoring to return FusionResponseWrapper like other calls...
+
+    }
+
+
+    /**
+     * Create fusion app object link
+     * @param map
+     * @param app
+     * @return
+     */
     FusionResponseWrapper createLink(Map<String, Object> map, String app) {
         HttpResponse<String> response = null
         JsonBuilder jsonBuilder = new JsonBuilder(map)
@@ -1120,6 +1272,83 @@ class FusionClient {
         return responses
     }
 
+    List<FusionResponseWrapper> addJobsIfMissing(String appName, Map srcFusionObjects) {
+        List<FusionResponseWrapper> responses = []
+        List<Map<String, Object>> existingJobs = getJobs(appName)
+
+        // --------------- Create Collections ------------------
+        srcFusionObjects['collections'].each { Map<String, Object> coll ->
+            String newCollname = coll.id
+            def existingColl = existingJobs.find { it.id == newCollname }
+            if (existingColl) {
+                log.info "\t\tSkipping existing collection ($newCollname)"
+                log.debug "\t\tSkipped existing collection ($newCollname): $existingColl"
+            } else {
+                boolean defaultFeatures = false
+                FusionResponseWrapper responseWrapper = createCollection(coll, appName, defaultFeatures)
+                if (responseWrapper.wasSuccess()) {
+                    log.info "Created Collection: ($coll)"
+                } else {
+                    log.warn "Had a problem creating collection: $coll??? Response wrapper: $responseWrapper"
+                }
+                responses << responseWrapper
+            }
+        }
+        return responses
+    }
+
+    List<FusionResponseWrapper> addJobSchedulesIfMissing(String appName = '', List<Map<String, Object>> srcJobsWithSchedules, boolean overwrite=false) {
+        log.info "addJobSchedulesIfMissing(app:$appName, srcJobsWithSchedules(${srcJobsWithSchedules.size()}):${srcJobsWithSchedules.collect { it.resource }}"
+        List<FusionResponseWrapper> responses = []
+        List<Map<String, Object>> existingJobs = getJobs(appName)
+
+        // --------------- Create Schedules ------------------
+        srcJobsWithSchedules.each {Map<String, Object> map ->
+            String srcResourceName = map.resource
+            def existingJob = existingJobs.find {Map<String,Object> existing ->  existing.resource == srcResourceName }
+            log.debug "Found matching jobs, src: $srcResourceName -> dest:$existingJob"
+            if (existingJob) {
+                def schedule = getJobSchedule(srcResourceName)
+                if (schedule && schedule.triggers && !overwrite) {
+                    log.info "\t\tJob schedule ($schedule) from source exists in destination Fusion app, nothing needed to add..."
+                } else {
+                    log.info "\t\tAdding Schedule ($map) from source to destination Fusion..."
+                    def response = createJobSchedule(map, appName)
+                    log.info "\t\tAdded Schedule ($map), result: $response"
+                    responses << response
+                }
+
+            } else {
+                log.warn "Missing source Job (${map.resource}) with triggers: ${map.triggers} in Destination Fusion ($fusionBase)"
+            }
+        }
+        return responses
+    }
+
+
+    FusionResponseWrapper createJobSchedule(Map json, String app) {
+        String url = null
+        String resource = json.resource
+//        if (app) {
+//            url = "$fusionBase/api/apps/${app}/${resource}/schedule"
+//        } else {
+            url = "$fusionBase/api/jobs/$resource/schedule"
+//        }
+        log.info "\t\tCreate Job Schedule, url: $url -- json: $json"
+        /*
+        {"resource":"datasource:test-names","enabled":true,
+        "triggers":[{"type":"interval","enabled":true,"interval":1,"timeUnit":"month","startTime":"2022-05-06T04:00:00.000Z"},
+        {"type":"job_completion","enabled":true,"triggerType":"on_success","otherJob":"datasource:test_csv-test"},
+        {"type":"interval","startTime":"2022-05-07T04:00:00.000Z","interval":1,"timeUnit":"month"}],
+        "default":false}
+         */
+        HttpRequest request = buildPutRequest(url, json)
+        FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
+
+        return fusionResponseWrapper
+    }
+
+
     List<FusionResponseWrapper> addDatasourcesIfMissing(String appName, Map srcFusionObjects, def oldLinks) {
         List<FusionResponseWrapper> responses = []
 
@@ -1216,15 +1445,15 @@ class FusionClient {
         // todo -- consider refactoring to return FusionResponseWrapper like other calls...
     }
 
-    /**
-     * get a list of solr config 'things' -- placeholders that then need to be loaded individually
-     * note: {{furl}}/api/solrAdmin/default/admin/configs?action=LIST&recursive=true
-     * @param collectionName
-     * @param configObject
-     * @param params
-     * @param handler
-     * @return list of entries in zookeeper (need to load each one, and possibly recursively for something like `lang`
-     */
+/**
+ * get a list of solr config 'things' -- placeholders that then need to be loaded individually
+ * note: {{furl}}/api/solrAdmin/default/admin/configs?action=LIST&recursive=true
+ * @param collectionName
+ * @param configObject
+ * @param params
+ * @param handler
+ * @return list of entries in zookeeper (need to load each one, and possibly recursively for something like `lang`
+ */
     List<Map<String, Object>> getSolrConfigList(String collectionName, Map<String, String> params = [expand: 'true', 'recursive': 'true']) {
         String url = "$fusionBase/api/collections/${collectionName}/solr-config"
         if (params) {
@@ -1236,11 +1465,12 @@ class FusionClient {
         FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request, handler)
         if (fusionResponseWrapper.wasSuccess()) {
             List<Map<String, Object>> solrConfigs = fusionResponseWrapper.parsedList
-            def flattened = solrConfigs.flatten()
-            flattened.each {Map<String, Object> m ->
+//            def flattened = solrConfigs.flatten()
+//            flattened.each {Map<String, Object> m ->
+            solrConfigs.each { Map<String, Object> m ->
                 SolrConfigThing thing = new SolrConfigThing(m)
                 m.thing = thing
-                if(thing.value){
+                if (thing.value) {
                     log.debug "what now? $thing"
                 }
             }
@@ -1252,14 +1482,14 @@ class FusionClient {
 
     }
 
-    /**
-     * get a specific node in the solr  config tree (zknode thing) -- this is as opposed to a directory/tree (such as `lang`
-     *
-     * @param collectionName
-     * @param configThingPath
-     * @param params
-     * @return
-     */
+/**
+ * get a specific node in the solr  config tree (zknode thing) -- this is as opposed to a directory/tree (such as `lang`
+ *
+ * @param collectionName
+ * @param configThingPath
+ * @param params
+ * @return
+ */
     SolrConfigThing getSolrConfigThing(String collectionName, String configThingPath, Map<String, String> params = [expand: 'true', 'recursive': 'true']) {
         String url = "$fusionBase/api/collections/${collectionName}/solr-config/${configThingPath}"
         if (params) {
@@ -1278,13 +1508,13 @@ class FusionClient {
 
     }
 
-    /**
-     * use fusion passthrough api to get "combined" schema from Solr (includes overlay.json....)
-     * url format: {{furl}}/api/solr/{{coll}}/schema
-     * @param collectionName
-     * @param params
-     * @return
-     */
+/**
+ * use fusion passthrough api to get "combined" schema from Solr (includes overlay.json....)
+ * url format: {{furl}}/api/solr/{{coll}}/schema
+ * @param collectionName
+ * @param params
+ * @return
+ */
     def getSolrSchema(String collectionName, Map<String, String> params = [action: 'LIST', wt: 'json']) {
 //        String url = "$fusionBase/api/objects/export?collection.ids=${collectionName}"
         String url = "$fusionBase/api/solr/${collectionName}/schema"
