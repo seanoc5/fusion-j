@@ -95,7 +95,7 @@ class FusionClient {
             log.info "given appname arg: $appName"
         }
         String srcObjectJsonPath = options.s
-        if (srcObjectJsonPath && !srcObjectJsonPath=='false') {
+        if (srcObjectJsonPath && srcObjectJsonPath!='false') {
             // todo -- add logic to read configs from live fusion (needs source: url, pass, furl, appname)
             File srcFile = new File(srcObjectJsonPath)
             if (srcFile.isFile() && srcFile.exists()) {
