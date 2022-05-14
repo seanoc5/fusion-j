@@ -904,6 +904,27 @@ class FusionClient {
     }
 
     /**
+     * get a list index pipelines already defined/existing in the (destination/F5) Fusion deployment
+     * @param app
+     * @return
+     */
+    Object getQueryPipelines(String app) {
+        HttpResponse<String> response = null
+        String url = null
+        if (app) {
+            url = "$fusionBase/api/apps/${app}/query-pipelines"
+        } else {
+            url = "$fusionBase/api/query-pipelines"
+            log.info "No app given, getting all query pipelines..."
+        }
+        log.info "\t list query pipelines for url: $url "
+        HttpRequest request = buildGetRequest(url)
+        FusionResponseWrapper responseWrapper = sendFusionRequest(request)
+
+        return responseWrapper.parsedInfo
+    }
+
+    /**
      * create and index pipeline by converting map object to json payload including destination application to connect it to
      * @param map
      * @param app
@@ -925,6 +946,33 @@ class FusionClient {
 
         } catch (IllegalArgumentException iae) {
             log.error "IllegalArgumentException creating INDEX PIPELINE($name): $iae"
+        }
+
+        return response
+    }
+
+    /**
+     * create a query pipeline by converting map object to json payload including destination application to connect it to
+     * @param map
+     * @param app
+     * @return
+     */
+    def createQueryPipeline(Map<String, Object> map, String qrypJson) {
+        HttpResponse<String> response = null
+        JsonBuilder jsonBuilder = new JsonBuilder(map)
+        String name = map.id
+        String jsonToQuery = jsonBuilder.toString()
+        try {
+            String url = "$fusionBase/api/apps/${app}/query-pipelines"
+            log.info "\t Create QUERY PIPELINE ($name) url: $url -- Json text size::\t ${jsonToQuery.size()}"
+            HttpRequest request = buildPostRequest(url, jsonToQuery)
+
+            FusionResponseWrapper responseWrapper = sendFusionRequest(request)
+
+            response = responseWrapper.response
+
+        } catch (IllegalArgumentException iae) {
+            log.error "IllegalArgumentException creating QUERY PIPELINE($name): $iae"
         }
 
         return response
@@ -1290,6 +1338,29 @@ class FusionClient {
                     log.info "Created Collection: ($coll)"
                 } else {
                     log.warn "Had a problem creating collection: $coll??? Response wrapper: $responseWrapper"
+                }
+                responses << responseWrapper
+            }
+        }
+        return responses
+    }
+
+    List<FusionResponseWrapper> addQueryPipelinesIfMissing(String appName, Map srcFusionObjects) {
+        List<FusionResponseWrapper> responses = []
+        List<Map<String, Object>> existingQryPs = getQueryPipelines(appName)
+
+        // --------------- Create Collections ------------------
+        srcFusionObjects['queryPipelines'].each { Map<String, Object> qryp ->
+            String qrypId = qryp.id
+            def existingQryp = existingQryPs.find { it.id == qrypId }
+            if (existingQryp) {
+                log.info "\t\tSkipping existing query pipeline ($qrypId)"
+            } else {
+                FusionResponseWrapper responseWrapper = createQueryPipeline(qryp, appName)
+                if (responseWrapper.wasSuccess()) {
+                    log.info "Created Collection: ($qryp)"
+                } else {
+                    log.warn "Had a problem creating collection: $qryp??? Response wrapper: $responseWrapper"
                 }
                 responses << responseWrapper
             }
