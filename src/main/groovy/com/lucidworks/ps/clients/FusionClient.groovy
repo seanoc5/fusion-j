@@ -95,7 +95,7 @@ class FusionClient {
             log.info "given appname arg: $appName"
         }
         String srcObjectJsonPath = options.s
-        if (srcObjectJsonPath && srcObjectJsonPath!='false') {
+        if (srcObjectJsonPath && srcObjectJsonPath != 'false') {
             // todo -- add logic to read configs from live fusion (needs source: url, pass, furl, appname)
             File srcFile = new File(srcObjectJsonPath)
             if (srcFile.isFile() && srcFile.exists()) {
@@ -125,6 +125,33 @@ class FusionClient {
                 exportDirectory = new File(exportDir)
                 if (exportDirectory.mkdir()) {
                     log.warn "Export dir($exportDir) did not exist, but we were able to make it (one child deep): ${exportDirectory.absolutePath}"
+                }
+            }
+        }
+
+        if (options.exportDir) {
+            File exportDir = new File(options.exportDir)
+            if (exportDir.exists()) {
+                if (exportDir.isDirectory()) {
+                    if (exportDir.canWrite()) {
+                        log.info "\tUsing export dir: ${exportDir.absolutePath}"
+                        this.exportDirectory = exportDir
+                    } else {
+                        log.warn "Export dir (${exportDir.absolutePath}) is NOT WRITABLE... throwing error"
+                        throw new IllegalArgumentException("Export dir (${exportDir.absolutePath}) is NOT WRITABLE! Aborting")
+                    }
+                } else {
+                    log.warn "Export dir (${exportDir.absolutePath})exists but is not a folder... throwing error"
+                    throw new IllegalArgumentException("Export dir (${exportDir.absolutePath}) exists but not a folder! Aborting")
+                }
+            } else {
+                def result = exportDir.mkdirs()
+                if (result) {
+                    this.exportDirectory = exportDir
+                    log.info "\tExport directory (${exportDir.absolutePath}) created"
+                } else {
+                    log.warn "Export directory (${exportDir.absolutePath}) could NOT be CREATED"
+                    throw new IllegalArgumentException("Export dir (${exportDir.absolutePath}) could not be created! Aborting")
                 }
             }
         }
@@ -271,7 +298,7 @@ class FusionClient {
         return applications
     }
 
-  def getApplication(String appId) {
+    def getApplication(String appId) {
         HttpResponse response = null
         String url = "$fusionBase/api/apps/${appId}"
         log.info "\t\tGet Fusion application ($appId) details via url: $url"
@@ -1375,15 +1402,15 @@ class FusionClient {
      * @param overwrite
      * @return
      */
-    List<FusionResponseWrapper> addJobSchedulesIfMissing(String appName = '', List<Map<String, Object>> srcJobsWithSchedules, boolean overwrite=false) {
+    List<FusionResponseWrapper> addJobSchedulesIfMissing(String appName = '', List<Map<String, Object>> srcJobsWithSchedules, boolean overwrite = false) {
         log.info "addJobSchedulesIfMissing(app:$appName, srcJobsWithSchedules(${srcJobsWithSchedules.size()}):${srcJobsWithSchedules.collect { it.resource }}"
         List<FusionResponseWrapper> responses = []
         List<Map<String, Object>> existingJobs = getJobs(appName)
 
         // --------------- Create Schedules ------------------
-        srcJobsWithSchedules.each {Map<String, Object> map ->
+        srcJobsWithSchedules.each { Map<String, Object> map ->
             String srcResourceName = map.resource
-            def existingJob = existingJobs.find {Map<String,Object> existing ->  existing.resource == srcResourceName }
+            def existingJob = existingJobs.find { Map<String, Object> existing -> existing.resource == srcResourceName }
             log.debug "Found matching jobs, src: $srcResourceName -> dest:$existingJob"
             if (existingJob) {
                 def schedule = getJobSchedule(srcResourceName)
@@ -1410,7 +1437,7 @@ class FusionClient {
 //        if (app) {
 //            url = "$fusionBase/api/apps/${app}/${resource}/schedule"
 //        } else {
-            url = "$fusionBase/api/jobs/$resource/schedule"
+        url = "$fusionBase/api/jobs/$resource/schedule"
 //        }
         log.info "\t\tCreate Job Schedule, url: $url -- json: $json"
         /*
