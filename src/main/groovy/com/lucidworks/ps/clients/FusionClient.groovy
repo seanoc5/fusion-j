@@ -1015,7 +1015,7 @@ class FusionClient {
      */
     List<Map<String, String>> getConnectorsRepository() {
         String url = "$fusionBase/connectors/repository"
-        log.info "getting all ...available... connectors"
+        log.debug "getting all ...available... connectors"
         HttpRequest request = buildGetRequest(url)
         FusionResponseWrapper responseWrapper = sendFusionRequest(request)
 
@@ -1031,7 +1031,7 @@ class FusionClient {
         HttpResponse<String> response = null
         String url = null
         url = "$fusionBase/api/connectors/plugins"
-        log.info "getting all installed connectors"
+        log.debug "getting all installed connectors"
         HttpRequest request = buildGetRequest(url)
         FusionResponseWrapper responseWrapper = sendFusionRequest(request)
 
@@ -1270,9 +1270,8 @@ class FusionClient {
                 log.info "More than one source Datasource connector for type ($type) -- used connectors: $usedConnectorsByType???"
             }
             log.debug "\t\tUsed: '$type' with (${usedDataSources.size()}) datasources "
-            List<Map<String, String>> installedMatches = connectorsInstalled.findAll {
-                it.type.containsIgnoreCase(type)
-            }
+            List<Map<String, String>> installedMatches = connectorsInstalled.findAll {it.type.containsIgnoreCase(type) }
+
             if (installedMatches) {
                 if (installedMatches.size() > 1) {
                     log.warn "More than one ready plugin match?? ($installedMatches)"
@@ -1284,7 +1283,7 @@ class FusionClient {
                     usedDsMatch = dsKeys[0]
                     log.debug "one datasource type: ${usedDsMatch}"
                     if (usedDsMatch.equalsIgnoreCase(installedMatches.type)) {
-                        log.info "\t\tdirect match on type: ready:$installedMatches --  dskeys:$dsKeys"
+                        log.debug "\t\tFound ready connector:$installedMatches -- nothing more to do"
                         connectorStatus.ready << installedMatches
                     } else {
                         log.warn "no direct match, what to do here?? ready:$installedMatches --  dskeys:$dsKeys"
@@ -1347,6 +1346,7 @@ class FusionClient {
         return responses
     }
 
+/*
     List<FusionResponseWrapper> addJobsIfMissing(String appName, Map srcFusionObjects) {
         List<FusionResponseWrapper> responses = []
         List<Map<String, Object>> existingJobs = getJobs(appName)
@@ -1371,12 +1371,13 @@ class FusionClient {
         }
         return responses
     }
+*/
 
     List<FusionResponseWrapper> addQueryPipelinesIfMissing(String appName, Map srcFusionObjects) {
         List<FusionResponseWrapper> responses = []
         List<Map<String, Object>> existingQryPs = getQueryPipelines(appName)
 
-        // --------------- Create Collections ------------------
+        // --------------- Create Query Pipelines ------------------
         srcFusionObjects['queryPipelines'].each { Map<String, Object> qryp ->
             String qrypId = qryp.id
             def existingQryp = existingQryPs.find { it.id == qrypId }
@@ -1461,11 +1462,10 @@ class FusionClient {
         // get map of existing links (faster lookups...?)
         srcFusionObjects['dataSources'].each { Map<String, Object> p ->
             String dsName = p.id
-            def existingDS = dsExisting.find {
-                it.id == dsName
-            }
+            def existingDS = dsExisting.find {it.id == dsName }
+
             if (existingDS) {
-                log.info "\tSKIPPING existing datasource: $dsName"
+                log.info "\t\tSKIPPING existing datasource: $dsName"
             } else {
                 log.info "CREATE datasource: $dsName "
                 FusionResponseWrapper responseWrapper = createDataSource(p, appName)
