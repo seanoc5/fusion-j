@@ -803,7 +803,7 @@ class FusionClient {
             HttpRequest request = buildPostRequest(url, jsonToIndex)
 
             fusionResponseWrapper = sendFusionRequest(request)
-            log.info "Created app? $info"
+            log.info "Created app? $jsonToIndex"
         } catch (Exception e) {
             log.error "Error: $e"
         }
