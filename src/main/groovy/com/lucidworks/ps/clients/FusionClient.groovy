@@ -1105,7 +1105,7 @@ class FusionClient {
     FusionResponseWrapper createDataSource(Map<String, Object> map, String app) {
         String jsonToIndex = new JsonBuilder(map).toString()
         String url = "$fusionBase/api/apps/${app}/connectors/datasources"
-        log.info "\t Create DATASOURCES (${map.id}) type(${map.connector}) url: $url -- Json text size::\t ${jsonToIndex.size()}"
+        log.debug "\t\t Create DATASOURCES (${map.id}) type(${map.connector}) url: $url -- Json text size::\t ${jsonToIndex.size()}"
         HttpRequest request = buildPostRequest(url, jsonToIndex)
         FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
     }
@@ -1250,15 +1250,15 @@ class FusionClient {
      * @return
      */
     Map<String, List<Object>> addConnectorPluginsIfMissing(Map srcFusionObjects) {
-        log.info "Installed Connectors: ${connectorsInstalled.size()}"
+        log.info "Found ()${connectorsInstalled.size()}) Installed Connectors"
         Map connectorStatus = [used: [], installed: [], repository: [], ready: [], added: [], missing: [], remapped: []]
         List<Map<String, String>> connectorsInstalled = getConnectorsInstalled()
-        log.debug "\t\t Connectors installed: $connectorsInstalled"
+        log.debug "\t\t Found connectors installed: $connectorsInstalled"
         connectorStatus.installed = connectorsInstalled
 
         List<Map<String, String>> connectorsRepository = getConnectorsRepository()
         connectorStatus.repository = connectorsRepository
-        log.info "Repository Connectors: ${connectorsRepository.size()}"
+        log.info "Found Repository Connectors: ${connectorsRepository.size()}"
 
         List<Map<String, Object>> connectorsUsed = getConnectorsUsed(srcFusionObjects)
         connectorStatus.used = connectorsUsed
@@ -1336,7 +1336,7 @@ class FusionClient {
                 boolean defaultFeatures = false
                 FusionResponseWrapper responseWrapper = createCollection(coll, appName, defaultFeatures)
                 if (responseWrapper.wasSuccess()) {
-                    log.info "Created Collection: ($coll)"
+                    log.debug "\t\tCreated Collection: ($coll)"
                 } else {
                     log.warn "Had a problem creating collection: $coll??? Response wrapper: $responseWrapper"
                 }
