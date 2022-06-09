@@ -1493,6 +1493,10 @@ class FusionClient {
         return responses
     }
 
+    /**
+     * Get the 'tree' from solr/zk for things like solrconfig, stopwords, managed-schema
+     * @return
+     */
     def getConfigSets() {
         String url = "$fusionBase/api/solrAdmin/default/admin/configs?action=LIST"
         // {{furl}}/api/solrAdmin/default/admin/configs?action=LIST
