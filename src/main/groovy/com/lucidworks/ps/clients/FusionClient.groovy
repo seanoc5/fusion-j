@@ -1536,6 +1536,13 @@ class FusionClient {
     }
 
 
+    /**
+     * get objects from REST api call -- can get string, or zip file...
+     * todo -- review, getting 500 error on my most recent check...
+     * @param params
+     * @param bodyHandler
+     * @return
+     */
     def getObjects(String params = '', HttpResponse.BodyHandler bodyHandler) {
         String url = "$fusionBase/api/objects/export${params}"
         HttpRequest request = buildGetRequest(url)
