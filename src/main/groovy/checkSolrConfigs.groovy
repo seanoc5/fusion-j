@@ -7,11 +7,16 @@ import java.net.http.HttpResponse
 import java.nio.file.Path
 import java.nio.file.Paths
 
+/**
+ * outdated test script? has some useful bits, but needs to be revised or remmoved
+ *
+ */
 Logger log = Logger.getLogger(this.class.name);
 
 log.info "Starting ${this.class.name}..."
 String toolName = this.class.name
 
+// todo switch to stanardized opts wrapper?
 CliBuilder cli = new CliBuilder(usage: "${toolName}.groovy -fhttp://myFusion5addr:6764 -uadmin -psecret123 -s~/data/MyApp.objects.json -m ~/Fusion/migration/F4/mappingFolder", width: 160)
 cli.with {
     h longOpt: 'help', 'Show usage information'
