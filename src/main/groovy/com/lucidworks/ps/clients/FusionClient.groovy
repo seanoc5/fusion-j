@@ -1535,9 +1535,9 @@ class FusionClient {
         // todo -- consider refactoring to return FusionResponseWrapper like other calls...
     }
 
+
     def getObjects(String params = '', HttpResponse.BodyHandler bodyHandler) {
         String url = "$fusionBase/api/objects/export${params}"
-        // {{furl}}/api/solrAdmin/default/admin/configs?action=LIST
         HttpRequest request = buildGetRequest(url)
         FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request, bodyHandler)
         if (fusionResponseWrapper.wasSuccess()) {
