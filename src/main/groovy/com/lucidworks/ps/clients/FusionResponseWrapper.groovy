@@ -6,6 +6,7 @@ import org.apache.log4j.Logger
 
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+
 /**
  * Helper class to provide some basic handling of requests and responses.
  * These objects may be collected/stored in the calling code for a history of actions performed (and any errors) during an upgrade/migration
