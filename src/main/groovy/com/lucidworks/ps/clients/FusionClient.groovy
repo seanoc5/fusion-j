@@ -1551,7 +1551,6 @@ class FusionClient {
             List<String> configSets = fusionResponseWrapper.parsedMap.configSets
             configSets.each {
                 log.debug "get configset: $it"
-
             }
             log.debug "Successfully got configsets (${configSets.size()}"
         } else {
