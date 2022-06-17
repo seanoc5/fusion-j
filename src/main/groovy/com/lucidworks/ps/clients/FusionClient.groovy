@@ -1398,10 +1398,10 @@ class FusionClient {
 
     /**
      * Read existing job schedules, and add anything "missing" from source (exported objects only at the moment)
-     * @param appName
+     * @param appName to help with adding links (using app name in api call??) -- todo -- consider moving to explicit link management -- this is likely not working properly at the moment
      * @param srcJobsWithSchedules
-     * @param overwrite
-     * @return
+     * @param overwrite flag to indicate if we should overwrite existing
+     * @return list of fusion responses (for later analysis)
      */
     List<FusionResponseWrapper> addJobSchedulesIfMissing(String appName = '', List<Map<String, Object>> srcJobsWithSchedules, boolean overwrite = false) {
         log.info "addJobSchedulesIfMissing(app:$appName, srcJobsWithSchedules(${srcJobsWithSchedules.size()}):${srcJobsWithSchedules.collect { it.resource }}"
@@ -1455,6 +1455,14 @@ class FusionClient {
     }
 
 
+    /**
+     * Add any missing datasources to this client's fusion instance
+     * @param appName
+     * @param srcFusionObjects
+     * @param oldLinks
+     * @return List<FusionResponseWrapper> list of responses (for review...) of any calls to add missing datasources
+     * @todo consider refactoring: do an "informed diff" and then add/update any that need updating
+     */
     List<FusionResponseWrapper> addDatasourcesIfMissing(String appName, Map srcFusionObjects, def oldLinks) {
         List<FusionResponseWrapper> responses = []
 
@@ -1531,8 +1539,7 @@ class FusionClient {
         } else {
             log.warn "Faled to get Object links!!?! Response wrapper: $fusionResponseWrapper"
         }
-        return fusionResponseWrapper.parsedMap.configSets
-        // todo -- consider refactoring to return FusionResponseWrapper like other calls...
+        return fusionResponseWrapper
     }
 
 
