@@ -13,7 +13,9 @@ import org.apache.commons.text.StringEscapeUtils
  */
 
 class JsonJavaScript {
+    /** the original source for the JS, assume this is from JSON so escaped, one line */
     String source
+    /** helper property of all lines split up, helpful in analyzing line (proxy for JS statement) complexity/intent */
     List<String> lines
 
     JsonJavaScript(String s) {
