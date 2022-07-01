@@ -76,8 +76,8 @@ class ManagedSchema implements BaseObject {
         if (lines[0].contains('xml')) {
             log.debug "Source (${src} appears to be xml, parse with XMLParser (not xml slurper)"
             XmlParser parser = new XmlParser()
-            schemaFields = collectSchemaFields()
             xmlSchema = parser.parseText(content)
+            schemaFields = collectSchemaFields()
             Map schemaFields = schemaFields.collectEntries {
                 String name = it.attribute('name')
                 [name: [schemaNode: it]]
@@ -85,7 +85,7 @@ class ManagedSchema implements BaseObject {
             knownfields = knownfields + schemaMap       // avoid using a reference, want a copy of the definedFields...
             schemaDynamicFieldDefinitions = collectDynamicFieldsDefinitions()
             fieldTypes = collectSchemaFieldTypes()
-            label = xmlSchema['name']
+            label = xmlSchema.@name
 
         } else if (lines[0].contains('{')) {
             log.warn "File (${src} appears to be JSON, parse with JsonSlurper (untested code: Json source...!!!)"
