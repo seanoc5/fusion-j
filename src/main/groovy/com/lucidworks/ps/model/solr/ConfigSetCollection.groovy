@@ -22,6 +22,15 @@ class ConfigSetCollection implements BaseObject{
         log.debug "Fusion configsetCollection (with ${configsetCollection.size()} source items) constructor, with (${collectionSize} grouped config sets)..."
     }
 
+    @Override
+    def export(){
+        configsetMap.each { String name, ConfigSet configSet ->
+            log.info "export configset ($name): ${configSet}"
+
+        }
+        log.info "exported config sets keys: ${configsetMap.keySet()}"
+    }
+
 
     @Override
     public String toString() {
