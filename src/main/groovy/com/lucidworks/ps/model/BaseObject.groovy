@@ -1,7 +1,7 @@
 package com.lucidworks.ps.model
 
+import com.lucidworks.ps.clients.FusionClient
 import org.apache.log4j.Logger
-
 /**
  * Base object to facilitate exporting to various destinations (filesystem, fusion instance,...)
  */
@@ -12,4 +12,9 @@ public interface BaseObject {
         // todo add default functionality here...?
         log.info "export me"
     }
+
+    def export(File exportFolder)
+
+    def export(FusionClient fusionClient)
+
 }
