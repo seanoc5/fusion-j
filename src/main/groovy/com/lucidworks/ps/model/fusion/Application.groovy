@@ -1,5 +1,6 @@
-package com.lucidworks.ps.model
+package com.lucidworks.ps.model.fusion
 
+import com.lucidworks.ps.model.BaseObject
 import com.lucidworks.ps.model.solr.ConfigSetCollection
 import groovy.json.JsonSlurper
 
