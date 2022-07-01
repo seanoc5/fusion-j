@@ -167,7 +167,7 @@ class Application implements BaseObject{
             log.debug "ZipEntry: $zipEntry"
         }
         Map parsedMetadata = parseAppMetadata(parsedMap)
-        log.info "Parsed app metadata: $parsedMetadata"
+        log.info "Parsed app metadata: ${parsedMetadata.keySet()}"
 
         if (cfgSets) {
             configsets = new ConfigSetCollection(cfgSets, this.appName)
@@ -182,7 +182,7 @@ class Application implements BaseObject{
         parsedMap = new JsonSlurper().parseText(jsonString)
         log.warn "More code here: do more parsing"
         Map parsedMetadata = parseAppMetadata(parsedMap)
-        log.info "Parsed app metadata: $parsedMetadata"
+        log.debug "Parsed app metadata: $parsedMetadata"
 
 
     }
