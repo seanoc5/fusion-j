@@ -11,7 +11,7 @@ import java.util.regex.Pattern
 /**
  * wrapper class to help with solr schema parsing and operations
  */
-class ManagedSchema implements BaseObject{
+class ManagedSchema implements BaseObject {
     public static final Pattern OVERRIDE_FIELDNAMES = ~/id|_version_|_raw_content_|_root_/
     Logger log = Logger.getLogger(this.class.name);
     /** source of content, if string, these will be equal, if file, or url, that will be different */
@@ -47,8 +47,8 @@ class ManagedSchema implements BaseObject{
      */
     ManagedSchema(def src, String label = 'unknown', def lukeOutput) {
         log.debug "Src(${src.getClass().simpleName}) AND luke output (${lukeOutput.getClass().simpleName})"
-        if(src instanceof  String){
-            if(src[0..20].contains(XML_START_TAG)){
+        if (src instanceof String) {
+            if (src[0..20].contains(XML_START_TAG)) {
                 source = "XML Source string"
             } else {
                 source = 'Unexpected Source string...'
@@ -76,15 +76,17 @@ class ManagedSchema implements BaseObject{
         if (lines[0].contains('xml')) {
             log.debug "Source (${src} appears to be xml, parse with XMLParser (not xml slurper)"
             XmlParser parser = new XmlParser()
-            xmlSchema = parser.parseText(content)
             schemaFields = collectSchemaFields()
+            xmlSchema = parser.parseText(content)
             Map schemaFields = schemaFields.collectEntries {
-                String name =it.attribute('name')
+                String name = it.attribute('name')
                 [name: [schemaNode: it]]
             }
             knownfields = knownfields + schemaMap       // avoid using a reference, want a copy of the definedFields...
             schemaDynamicFieldDefinitions = collectDynamicFieldsDefinitions()
             fieldTypes = collectSchemaFieldTypes()
+            label = xmlSchema['name']
+
         } else if (lines[0].contains('{')) {
             log.warn "File (${src} appears to be JSON, parse with JsonSlurper (untested code: Json source...!!!)"
             JsonSlurper slurper = new JsonSlurper()
@@ -295,6 +297,6 @@ class ManagedSchema implements BaseObject{
     }
 
     String toString() {
-        String s = ""
+        String s = "${this.label}"
     }
 }
