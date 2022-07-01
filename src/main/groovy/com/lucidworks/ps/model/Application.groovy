@@ -113,6 +113,13 @@ class Application implements BaseObject{
         parsedMetadata
     }
 
+
+    /**
+     * helper to get various fusion things from this fusion app model
+     * todo -- move all the untyped things to wrapper objects to implement BaseObject
+     * @param String thingType - property of this Application holding the things (e.g.datasources, pipelines, configsets...) to export
+     * @return the things exported
+     */
     def getThings(String thingType) {
         def things = this.properties[thingType]
         return things
