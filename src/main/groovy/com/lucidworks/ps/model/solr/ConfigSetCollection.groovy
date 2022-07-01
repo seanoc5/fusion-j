@@ -1,5 +1,6 @@
 package com.lucidworks.ps.model.solr
 
+import com.lucidworks.ps.clients.FusionClient
 import com.lucidworks.ps.model.BaseObject
 import org.apache.log4j.Logger
 
@@ -26,11 +27,19 @@ class ConfigSetCollection implements BaseObject{
     def export(){
         configsetMap.each { String name, ConfigSet configSet ->
             log.info "export configset ($name): ${configSet}"
-
         }
         log.info "exported config sets keys: ${configsetMap.keySet()}"
     }
 
+    @Override
+    def export(File exportFolder) {
+        return null
+    }
+
+    @Override
+    def export(FusionClient fusionClient) {
+        return null
+    }
 
     @Override
     public String toString() {

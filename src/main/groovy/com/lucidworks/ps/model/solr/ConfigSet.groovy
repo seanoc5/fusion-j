@@ -1,5 +1,6 @@
 package com.lucidworks.ps.model.solr
 
+import com.lucidworks.ps.clients.FusionClient
 import com.lucidworks.ps.model.BaseObject
 import groovy.json.JsonSlurper
 import groovy.xml.XmlParser
@@ -26,12 +27,23 @@ class ConfigSet implements BaseObject{
     def synonyms = ''
     def protwords = ''
 
-//    ConfigSet(def configsetName, def items) {
     ConfigSet(String configsetName, Map<String, Object> items) {
         this.configsetName = configsetName
         this.items = items
         def foo = populateParsedItems()
         log.debug "Constructor(name, items)-> ${this.toString()}"
+    }
+
+    @Override
+    def export(File exportFolder) {
+        log.warn "more code here: export object to destination folder: ${exportFolder.absolutePath}"
+        log.info "export to folder: ${exportFolder}"
+    }
+
+    @Override
+    def export(FusionClient fusionClient) {
+        log.warn "more code here: export object to destination fusion client: $fusionClient"
+        return null
     }
 
 
@@ -174,4 +186,5 @@ class ConfigSet implements BaseObject{
     String toString() {
         String s = "Configset ($configsetName): Schema:(${managedSchema.toString()}) SolrConfig:(${solrConfig.toString()}) ... "
     }
+
 }
