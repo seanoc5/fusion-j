@@ -1,15 +1,14 @@
 package com.lucidworks.ps.model.fusion
 
+import com.lucidworks.ps.clients.FusionClient
 import com.lucidworks.ps.model.BaseObject
 import com.lucidworks.ps.model.solr.ConfigSetCollection
 import groovy.json.JsonSlurper
-
-
 import org.apache.log4j.Logger
 
+import java.util.regex.Pattern
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
-
 /**
  * Fusion Application helper class
  * Mix of composite objects (@see ConfigSetCollection) and regular lists/maps
@@ -82,6 +81,21 @@ class Application implements BaseObject{
 
         log.debug "loaded application: $this"
     }
+
+    def export(File destinationFile, Pattern thingsToExport){
+        log.info "more code here: export application with things matching pattern: ($thingsToExport)"
+    }
+
+    def export(FusionClient destinationClient, Pattern thingsToExport){
+        log.info "more code here: export application with things matching pattern: ($thingsToExport)"
+    }
+
+/*
+    def export(GitClient destinationGit, Pattern thingsToExport){
+        log.info "more code here: export application with things matching pattern: ($thingsToExport)"
+    }
+*/
+
 
     public Map<String, Object> parseAppMetadata(Map<String, Object> parsedMap) {
         Map parsedMetadata = [:]
@@ -209,34 +223,6 @@ class Application implements BaseObject{
 
     }
 
-/*
-    def exportObjects(Map){
-
-    }
-*/
 }
 
 
-/*
-    def getThingsToCompare(def matchPattern = '') {
-
-        def fields = Application.declaredFields
-        def appThings = fields.findAll { Field f ->
-            boolean matches = true
-            String fname = f.toString()
-
-            if (fname.contains('log4j')) {
-                log.debug "skip log4j"
-                matches = false
-            } else {
-                matches = (f.toString() ==~ matchPattern)
-            }
-            return matches
-        }
-        def thingNames = appThings.collect { it.name }
-    }
-*/
-/*
-    Application() {
-    }
-*/
