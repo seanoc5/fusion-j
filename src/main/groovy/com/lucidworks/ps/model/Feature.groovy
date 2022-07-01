@@ -14,7 +14,7 @@ import org.apache.log4j.Logger
  * i.e. help determine what are "support" collections vs "main" collections (this wrapper object is probably not necessary)
  * todo -- review and either remove, or flesh out...
  */
-class Feature {
+class Feature implements BaseObject{
     Logger log = Logger.getLogger(this.class.name);
     List<Map<String, Object>> items = []
 

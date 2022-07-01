@@ -1,6 +1,6 @@
 package com.lucidworks.ps.model.solr
 
-
+import com.lucidworks.ps.model.BaseObject
 import org.apache.log4j.Logger
 
 import java.util.regex.Matcher
@@ -9,33 +9,13 @@ import java.util.regex.Pattern
 /**
  * wrapper class to help with solr schema parsing and operations
  */
-class ConfigSetCollection {
+class ConfigSetCollection implements BaseObject{
     Logger log = Logger.getLogger(this.class.name);
     String deploymentName          // can be empty if getting from solr direcltly (i.e. all apps all configsets...?)
     Map<String, List<ConfigSet>> configsetMap = [:]
-    def foo = 'bar'
-    public static final Pattern DEFAULT_KEY_PATTERN = ~/.*configsets\/([^\/]+)(\/.*)/
     // first group is the configset name (collection-name), second group is the path to use in the configset
+    public static final Pattern DEFAULT_KEY_PATTERN = ~/.*configsets\/([^\/]+)(\/.*)/
 
-
-    /**
-     * Constructor with F4+ app export (zip) file to get
-     * @param appExport
-     */
-/*
-    ConfigSetCollection(File appExport) {
-        Application app = new Application(appExport)
-        def rc = parseConfigsetCollection(app.configsetMap)
-        log.info "Fusion app export file (${appExport.absoluteFile}) with parsed app:($app) constructor, with (${configsetMap.size()} config sets)..."
-    }
-*/
-
-/*
-    ConfigSetCollection(Application app) {
-        configsetMap = parseConfigsetCollection(app.configsetMap)
-        log.info "Fusion parsed app ($app) constructor, with (${configsetMap.size()} config sets)..."
-    }
-*/
 
     ConfigSetCollection(Map configsetCollection, String deploymentName) {
         Integer collectionSize = parseConfigsetCollection(configsetCollection, deploymentName)
@@ -45,7 +25,7 @@ class ConfigSetCollection {
 
     @Override
     public String toString() {
-        return "ConfigSetCollection: $deploymentName with (${configsetMap.size()}) collection configsets"
+        return "ConfigSetCollection: $deploymentName with (${configsetMap.size()}) collection configsets, keys: ${configsetMap.keySet()}"
     }
 
     /**

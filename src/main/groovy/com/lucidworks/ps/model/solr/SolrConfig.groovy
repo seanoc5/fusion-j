@@ -1,5 +1,6 @@
 package com.lucidworks.ps.model.solr
 
+import com.lucidworks.ps.model.BaseObject
 import groovy.xml.XmlParser
 import org.apache.log4j.Logger
 
@@ -14,7 +15,7 @@ import org.apache.log4j.Logger
  * wrapper class ato provide 'solrconfig.xml' specific processing and structure
  * @NOTE assuming XML format only, JSON format may come in the future...
  */
-class SolrConfig {
+class SolrConfig implements BaseObject {
     Logger log = Logger.getLogger(this.class.name);
     String sourceContent
     def sourceURI           // optional? useful??

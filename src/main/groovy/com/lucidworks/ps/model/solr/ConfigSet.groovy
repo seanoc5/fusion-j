@@ -1,5 +1,6 @@
 package com.lucidworks.ps.model.solr
 
+import com.lucidworks.ps.model.BaseObject
 import groovy.json.JsonSlurper
 import groovy.xml.XmlParser
 import org.apache.log4j.Logger
@@ -9,7 +10,7 @@ import java.util.regex.Pattern
 /**
  * wrapper class to help with solr schema parsing and operations
  */
-class ConfigSet {
+class ConfigSet implements BaseObject{
     public static final Pattern SOLR_CONFIG_PATTERN = ~/\/solrconfig.xml/
     Logger log = Logger.getLogger(this.class.name);
     public static final Pattern LANG_FOLDER_PATTERN = ~/\/lang\/.+/
