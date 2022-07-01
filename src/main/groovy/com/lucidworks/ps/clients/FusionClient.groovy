@@ -1,5 +1,6 @@
 package com.lucidworks.ps.clients
 
+import com.lucidworks.ps.model.Application
 import com.lucidworks.ps.solr.SolrConfigThing
 import groovy.cli.picocli.OptionAccessor
 import groovy.json.JsonBuilder
@@ -31,6 +32,7 @@ import java.time.Duration
  */
 class FusionClient {
     protected static Logger log = Logger.getLogger(this.class.name)
+    Application application
     String user = null
     String password = null
     String fusionBase = null
