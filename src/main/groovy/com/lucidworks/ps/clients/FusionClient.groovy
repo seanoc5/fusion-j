@@ -1,6 +1,6 @@
 package com.lucidworks.ps.clients
 
-import com.lucidworks.ps.model.Application
+import com.lucidworks.ps.model.fusion.Application
 import com.lucidworks.ps.solr.SolrConfigThing
 import groovy.cli.picocli.OptionAccessor
 import groovy.json.JsonBuilder

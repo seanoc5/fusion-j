@@ -1,5 +1,6 @@
-package com.lucidworks.ps.model
+package com.lucidworks.ps.model.fusion
 
+import com.lucidworks.ps.model.BaseObject
 import org.apache.log4j.Logger
 
 /**
