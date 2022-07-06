@@ -187,8 +187,14 @@ class Application implements BaseObject{
         ZipFile zipFile = new ZipFile(appExportZipFile)
         Enumeration<? extends ZipEntry> entries = zipFile.entries()
         Map<String,String> cfgSets = [:]
+        int LOG_BATCH_SIZE = 100
+        int counter = 0
         JsonSlurper jsonSlurper = new JsonSlurper()
         entries.each { ZipEntry zipEntry ->
+            counter++
+            if(count % LOG_BATCH_SIZE == 0 ) {
+                log.info "$counter) "
+            }
             if (zipEntry.name.contains('objects.json')) {
                 objectsJson = extractZipEntryText(zipFile, zipEntry)
                 parsedMap = jsonSlurper.parseText(objectsJson)
