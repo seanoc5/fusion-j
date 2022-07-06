@@ -1,5 +1,6 @@
 package com.lucidworks.ps.clients
 
+import com.lucidworks.ps.Helper
 import com.lucidworks.ps.model.fusion.Application
 import com.lucidworks.ps.solr.SolrConfigThing
 import groovy.cli.picocli.OptionAccessor
@@ -102,6 +103,8 @@ class FusionClient {
             File srcFile = new File(srcObjectJsonPath)
             if (srcFile.isFile() && srcFile.exists()) {
                 objectsJsonFile = srcFile
+                log.debug "found a source file: ${srcFile.absolutePath}, loading application from it...."
+                application = new Application(objectsJsonFile)
                 log.info "Source file exists: ${objectsJsonFile.absolutePath}"
             } else {
                 log.warn "Source file: ${srcFile.absolutePath} does NOT EXIST..."
@@ -111,51 +114,12 @@ class FusionClient {
             log.debug "No source file arg given (not reading app export, nor objects.json)... "
         }
 
+        // some optional label to group things by (client name, or app name)
         objectsGroup = options.g
-        String x = options.x ?: null
-        if (x) {
-            exportDirectory = new File(x)
-            if (exportDirectory.exists()) {
-                if (exportDirectory.isDirectory()) {
-                    log.debug "Got reasonable export dir: ${exportDirectory.absolutePath}"
-                } else {
-                    String msg = "Export directory not a directory: ${exportDirectory.absolutePath}"
-                    log.error msg
-                    throw new IllegalArgumentException(msg)
-                }
-            } else {
-                exportDirectory = new File(exportDir)
-                if (exportDirectory.mkdir()) {
-                    log.warn "Export dir($exportDir) did not exist, but we were able to make it (one child deep): ${exportDirectory.absolutePath}"
-                }
-            }
-        }
 
+        // if we have an export directory, make sure if exists, and save it in class prop
         if (options.exportDir) {
-            File exportDir = new File(options.exportDir)
-            if (exportDir.exists()) {
-                if (exportDir.isDirectory()) {
-                    if (exportDir.canWrite()) {
-                        log.info "\tUsing export dir: ${exportDir.absolutePath}"
-                        this.exportDirectory = exportDir
-                    } else {
-                        log.warn "Export dir (${exportDir.absolutePath}) is NOT WRITABLE... throwing error"
-                        throw new IllegalArgumentException("Export dir (${exportDir.absolutePath}) is NOT WRITABLE! Aborting")
-                    }
-                } else {
-                    log.warn "Export dir (${exportDir.absolutePath})exists but is not a folder... throwing error"
-                    throw new IllegalArgumentException("Export dir (${exportDir.absolutePath}) exists but not a folder! Aborting")
-                }
-            } else {
-                def result = exportDir.mkdirs()
-                if (result) {
-                    this.exportDirectory = exportDir
-                    log.info "\tExport directory (${exportDir.absolutePath}) created"
-                } else {
-                    log.warn "Export directory (${exportDir.absolutePath}) could NOT be CREATED"
-                    throw new IllegalArgumentException("Export dir (${exportDir.absolutePath}) could not be created! Aborting")
-                }
-            }
+            exportDirectory = Helper.getOrMakeDirectory(options.exportDir)
         }
 
         log.info """Initialized FusionClient with command line options:
