@@ -1,5 +1,6 @@
 package com.lucidworks.ps.model.solr
 
+import com.lucidworks.ps.clients.FusionClient
 import com.lucidworks.ps.model.BaseObject
 import groovy.json.JsonSlurper
 import groovy.xml.XmlParser
@@ -298,5 +299,18 @@ class ManagedSchema implements BaseObject {
 
     String toString() {
         String s = "${this.label}"
+    }
+
+    @Override
+    def export(File exportFolder) {
+        log.info "export managed schema to folder: ${exportFolder.absolutePath}"
+
+        return null
+    }
+
+    @Override
+    def export(FusionClient fusionClient) {
+        throw new RuntimeException("Export to live fusion client not implemented yet...")
+        return null
     }
 }

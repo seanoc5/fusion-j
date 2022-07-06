@@ -32,7 +32,7 @@ class Application implements BaseObject{
     List<Map> indexPipelines
     List<Map> queryPipelines
     List<Map> parsers
-    List<Map> blobs
+    Map<String, Object> blobs = [:]
     List<Map> appkitApps
     Map featuresMap         // https://doc.lucidworks.com/fusion/5.5/333/collection-features-api
     List<Map> objectGroups
@@ -40,6 +40,7 @@ class Application implements BaseObject{
     List<Map> sparkJobs
 //    Map<String, Object> configsetMap = [:]
     ConfigSetCollection configsets
+    Map<String, Object> unknownItems = [:]  // map of items (from zip file export??) that we do not (yet) explicitly handle...
 
     /**
      * helper main function to test functionality, change the file arg accordingly...
@@ -90,11 +91,18 @@ class Application implements BaseObject{
         log.info "more code here: export application with things matching pattern: ($thingsToExport)"
     }
 
-/*
-    def export(GitClient destinationGit, Pattern thingsToExport){
-        log.info "more code here: export application with things matching pattern: ($thingsToExport)"
+    @Override
+    def export(File exportFolder) {
+        log.info "export Application to folder: ${exportFolder.absolutePath}"
+
+        return null
     }
-*/
+
+    @Override
+    def export(FusionClient fusionClient) {
+        throw new RuntimeException("Export to live fusion client not implemented yet...")
+        return null
+    }
 
 
     public Map<String, Object> parseAppMetadata(Map<String, Object> parsedMap) {
@@ -111,6 +119,7 @@ class Application implements BaseObject{
             log.info "\t\tGot some unxpected source map ${parsedMap.keySet()}, hoping we were called with [objects.json].objects (subset)...? won't have full metadata "
             objects = parsedMap
         }
+
         if (objects.fusionApps) {
             log.info "We have a fusion app export/zip (assume fusion 4 and above...)"
             fusionApps = objects.fusionApps
@@ -171,9 +180,11 @@ class Application implements BaseObject{
     }
 
     public void loadFromAppExportArchive(File appExportZipFile) {
+        log.info "Load app from export ZIP archive: ${appExportZipFile.absolutePath} ..."
         ZipFile zipFile = new ZipFile(appExportZipFile)
         Enumeration<? extends ZipEntry> entries = zipFile.entries()
-        Map cfgSets = [:]
+        Map<String,String> cfgSets = [:]
+//        Map<String,Object> blobs = [:]
         entries.each { ZipEntry zipEntry ->
             if (zipEntry.name.contains('objects.json')) {
                 objectsJson = extractZipEntryText(zipFile, zipEntry)
@@ -185,6 +196,18 @@ class Application implements BaseObject{
                 String content = extractZipEntryText(zipFile, zipEntry)
                 cfgSets[name] = content
                 log.debug "Configset: $zipEntry"
+
+            } else if (zipEntry.name.startsWith('blobs')) {
+                String name = zipEntry.name
+                String content = extractZipEntryText(zipFile, zipEntry)
+                blobs[name] = content
+                log.debug "Blob: $zipEntry"
+
+            } else {
+                String name = zipEntry.name
+                String content = extractZipEntryText(zipFile, zipEntry)
+                unknownItems[name] = content
+                log.info "Storing UNKNOWN zip entry: ${zipEntry} (in application.unknownItems map) -- is this a problem? anything valuable we should be processing?"
             }
             log.debug "ZipEntry: $zipEntry"
         }

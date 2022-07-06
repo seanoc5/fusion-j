@@ -1,5 +1,6 @@
 package com.lucidworks.ps.model.fusion
 
+import com.lucidworks.ps.clients.FusionClient
 import com.lucidworks.ps.model.BaseObject
 import org.apache.log4j.Logger
 /**
@@ -27,6 +28,18 @@ class Collections implements BaseObject{
         def parseResult = parseSourceFile(appOrJson)
     }
 
+    @Override
+    def export(File exportFolder) {
+        log.info "export collections to folder: ${exportFolder.absolutePath}"
+
+        return null
+    }
+
+    @Override
+    def export(FusionClient fusionClient) {
+        throw new RuntimeException("Export to live fusion client not implemented yet...")
+        return null
+    }
 
 
     Map<String, Object> parseSourceFile(File appOrJson) {

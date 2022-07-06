@@ -1,5 +1,6 @@
 package com.lucidworks.ps.model.solr
 
+import com.lucidworks.ps.clients.FusionClient
 import com.lucidworks.ps.model.BaseObject
 import groovy.xml.XmlParser
 import org.apache.log4j.Logger
@@ -58,4 +59,15 @@ class SolrConfig implements BaseObject {
         this.xml = xmlParser.parse(uri)
     }
 
+    @Override
+    def export(File exportFolder) {
+        log.info "export solrconfig to folder: ${exportFolder.absolutePath}"
+        return null
+    }
+
+    @Override
+    def export(FusionClient fusionClient) {
+        throw new RuntimeException("Export to live fusion client not implemented yet...")
+        return null
+    }
 }
