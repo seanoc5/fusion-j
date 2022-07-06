@@ -40,6 +40,9 @@ class Application implements BaseObject{
     List<Map> sparkJobs
 //    Map<String, Object> configsetMap = [:]
     ConfigSetCollection configsets
+    Map<String, String> queryRewriteJson
+    Map<String, Object> queryRewriteRules
+
     Map<String, Object> unknownItems = [:]  // map of items (from zip file export??) that we do not (yet) explicitly handle...
 
     /**
@@ -184,12 +187,11 @@ class Application implements BaseObject{
         ZipFile zipFile = new ZipFile(appExportZipFile)
         Enumeration<? extends ZipEntry> entries = zipFile.entries()
         Map<String,String> cfgSets = [:]
-//        Map<String,Object> blobs = [:]
+        JsonSlurper jsonSlurper = new JsonSlurper()
         entries.each { ZipEntry zipEntry ->
             if (zipEntry.name.contains('objects.json')) {
                 objectsJson = extractZipEntryText(zipFile, zipEntry)
-                JsonSlurper slurper = new JsonSlurper()
-                parsedMap = slurper.parseText(objectsJson)
+                parsedMap = jsonSlurper.parseText(objectsJson)
                 log.debug "\t\textracted json text from zip entry: ${((Map)parsedMap).keySet()}"
             } else if (zipEntry.name.contains('configsets')) {
                 String name = zipEntry.name
@@ -202,6 +204,13 @@ class Application implements BaseObject{
                 String content = extractZipEntryText(zipFile, zipEntry)
                 blobs[name] = content
                 log.debug "Blob: $zipEntry"
+
+            } else if (zipEntry.name.startsWith('query_rewrite')) {
+                String name = zipEntry.name
+                String content = extractZipEntryText(zipFile, zipEntry)
+                queryRewriteJson[name] = content
+                queryRewriteRules[name] = jsonSlurper.parseText(content)
+                log.info "Query Rewrite rules count: ${queryRewriteRules.size()} from zip entry: $zipEntry"
 
             } else {
                 String name = zipEntry.name
