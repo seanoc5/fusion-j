@@ -32,16 +32,17 @@ class Application implements BaseObject{
     List<Map> indexPipelines
     List<Map> queryPipelines
     List<Map> parsers
-    Map<String, Object> blobs = [:]
+    /** list of blob objects -- often zipEntries from an app export zip... */
+    List blobObjects = []
+    List blobs = []
     List<Map> appkitApps
     Map featuresMap         // https://doc.lucidworks.com/fusion/5.5/333/collection-features-api
     List<Map> objectGroups
     List<Map> links
     List<Map> sparkJobs
-//    Map<String, Object> configsetMap = [:]
     ConfigSetCollection configsets
-    Map<String, String> queryRewriteJson
-    Map<String, Object> queryRewriteRules
+    Map<String, String> queryRewriteJson = [:]
+    Map<String, Object> queryRewriteRules = [:]
 
     Map<String, Object> unknownItems = [:]  // map of items (from zip file export??) that we do not (yet) explicitly handle...
 
@@ -207,22 +208,24 @@ class Application implements BaseObject{
 
             } else if (zipEntry.name.startsWith('blobs')) {
                 String name = zipEntry.name
-                String content = extractZipEntryText(zipFile, zipEntry)
-                blobs[name] = content
-                log.debug "Blob: $zipEntry"
+                // todo -- write code to get/store blob object intelligently
+                log.info "\t\t$name) zipEntry "
+//                String content = extractZipEntryText(zipFile, zipEntry)
+                blobObjects << zipEntry
+                log.debug "\t\tBlob object: $zipEntry"
 
             } else if (zipEntry.name.startsWith('query_rewrite')) {
                 String name = zipEntry.name
                 String content = extractZipEntryText(zipFile, zipEntry)
                 queryRewriteJson[name] = content
                 queryRewriteRules[name] = jsonSlurper.parseText(content)
-                log.info "Query Rewrite rules count: ${queryRewriteRules.size()} from zip entry: $zipEntry"
+                log.info "\t\tQuery Rewrite rules count: ${queryRewriteRules.size()} from zip entry: $zipEntry"
 
             } else {
                 String name = zipEntry.name
                 String content = extractZipEntryText(zipFile, zipEntry)
                 unknownItems[name] = content
-                log.info "Storing UNKNOWN zip entry: ${zipEntry} (in application.unknownItems map) -- is this a problem? anything valuable we should be processing?"
+                log.warn "Storing UNKNOWN zip entry: ${zipEntry} (in application.unknownItems map) -- is this a problem? anything valuable we should be processing?"
             }
             log.debug "ZipEntry: $zipEntry"
         }
@@ -247,6 +250,12 @@ class Application implements BaseObject{
 
     }
 
+    /**
+     * limited function to read text content from zip entries (blobs come to mind as a problem?)
+     * @param zipFile
+     * @param zipEntry
+     * @return
+     */
     public String extractZipEntryText(ZipFile zipFile, ZipEntry zipEntry) {
         String jsonString
         InputStream inputStream = zipFile.getInputStream(zipEntry)

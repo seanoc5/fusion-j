@@ -36,8 +36,24 @@ class ConfigSet implements BaseObject{
 
     @Override
     def export(File exportFolder) {
-        log.warn "more code here: export object to destination folder: ${exportFolder.absolutePath}"
-        log.info "export to folder: ${exportFolder}"
+//        log.warn "more code here: export object to destination folder: ${exportFolder.absolutePath}"
+        log.debug "export to folder: ${exportFolder}"
+        List<File> exportedFiles = []
+        items.each { String name, Object value ->
+            // todo -- look at library (apache commons-text??) to sanitize filenames...?
+            String outname = name.replaceAll(/\//, '_')
+            if(outname.startsWith('_')){
+                log.debug "remove leading '.' in outfile name (typically zk path with leading '/' slash..."
+                outname = outname[1..-1]
+            }
+            outname = outname.endsWith('.json') ? "configset.${this.configsetName}.${outname}" : "configset.${this.configsetName}.${outname}.json"
+            log.debug "Convert name ($name) to outname ($outname)"
+            File outfile = new File(exportFolder, outname )
+            // todo -- handle non-text output...
+            outfile.text = value
+            exportedFiles << outfile
+        }
+        return exportedFiles
     }
 
     @Override
