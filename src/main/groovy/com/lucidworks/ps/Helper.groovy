@@ -1,6 +1,9 @@
 package com.lucidworks.ps
 
 import org.apache.log4j.Logger
+
+import java.text.DateFormat
+import java.text.SimpleDateFormat
 //import java.security.InvalidParameterException
 
 /**
@@ -34,6 +37,20 @@ class Helper {
             }
         }
         folder
+    }
+
+    /**
+     * placeholder for getting a psuedo source-control folder name for exports (and potentially imports / restore)
+     * @param date
+     * @param dateFormat --
+     * @return a "sort friendly" datestamp with hour & minute to allow multiple snapshots per day (or per hour)...
+     */
+    static String getVersionName(Date date = new Date(), DateFormat dateFormat = new SimpleDateFormat('yyyy-MM-dd.hh.mm')) {
+        String s = dateFormat.format(date)
+    }
+
+    static String sanitizeFilename(String name, String substitute = '_', String regex = "[^a-zA-Z0-9\\.\\-]"){
+        String sanitized = name.replaceAll(regex, substitute);
     }
 }
 
