@@ -34,9 +34,11 @@ class ManagedSchema implements BaseObject {
      * simple constructor with just the managed schema source (file, url, string,...?)
      * @param src
      */
-    ManagedSchema(def src, String label = 'unknown') {
+    ManagedSchema(def src, String lbl) {
+//    ManagedSchema(def src, String label = 'unknown') {
         log.debug "Simple constructor WITHOUT luke param (missing luke means less helpful analysis on what is used and not used)"
         source = src
+        this.label = lbl
         parseSchema(src)
     }
 
@@ -66,7 +68,8 @@ class ManagedSchema implements BaseObject {
     /**
      * assume XML format, create the wrapper object, and return that (as something to check/review)
      * @param src
-     * @return ManagedSchema -- parsed wrapper object to encapsulate some functionality and relevant structure
+     * @return ??what makes sense here?? anything? nothing?
+     * should we return ManagedSchema ?? -- parsed wrapper object to encapsulate some functionality and relevant structure
      * @throws InvalidParameterException
      */
     def parseSchema(def src) throws InvalidParameterException {
@@ -78,22 +81,27 @@ class ManagedSchema implements BaseObject {
             log.debug "Source (${src} appears to be xml, parse with XMLParser (not xml slurper)"
             XmlParser parser = new XmlParser()
             xmlSchema = parser.parseText(content)
-            schemaFields = collectSchemaFields()
-            Map schemaFields = schemaFields.collectEntries {
-                String name = it.attribute('name')
-                [name: [schemaNode: it]]
+            if(label){
+                label = label + ":" + xmlSchema.@name
+            } else {
+                label = xmlSchema.@name
             }
-            knownfields = knownfields + schemaMap       // avoid using a reference, want a copy of the definedFields...
+            schemaFields = collectSchemaFields()
+
+            log.debug "todo -- revisit this code, double check knownfields compilation process..."
+            knownfields = schemaMap
+            // todo -- add luke 'used' fields...?       // avoid using a reference, want a copy of the definedFields...
+//            knownfields = knownfields + schemaMap       // avoid using a reference, want a copy of the definedFields...
             schemaDynamicFieldDefinitions = collectDynamicFieldsDefinitions()
             fieldTypes = collectSchemaFieldTypes()
-            label = xmlSchema.@name
-
+            return xmlSchema
         } else if (lines[0].contains('{')) {
             log.warn "File (${src} appears to be JSON, parse with JsonSlurper (untested code: Json source...!!!)"
             JsonSlurper slurper = new JsonSlurper()
             schemaMap = slurper.parse(src)
+            return schemaMap
         }
-        return schemaMap
+
     }
 
     String getSchemaContent(Serializable src) {
@@ -195,17 +203,22 @@ class ManagedSchema implements BaseObject {
     }
 
     def collectSchemaFields() {
-        def fields = xmlSchema.'**'.findAll { Node node ->
-            // slightly hackish combining the filtering and populating 'usedFields', but I'm bored and want to see if it works...
-            String nodeName = node.name()
-            if (nodeName == 'field') {
-                String fieldName = node.attribute('name')
-                String type = node.attribute('type')
-                knownfields[fieldName] = [name: fieldName, type: type, schemaNode: node]
-                return true
-            } else {
-                return false
+        def fields
+        log.info "collectSchemaFields label: $label"
+        try {
+            def previousNode
+            fields = xmlSchema.'**'.findAll { Object node ->
+                String nodeName
+                if(node instanceof Node) {
+                    nodeName = node.name()
+                    previousNode = node
+                } else {
+                    log.info "Current node NOT a Groovy XML Node (syntax problem??) --  previousNode(for debugging): $previousNode -- Current unknown-node-thingie(${node.getClass().simpleName}): $node"
+                }
+                nodeName == 'field'
             }
+        } catch (Exception e) {
+            log.error "Error: $e"
         }
         return fields
     }
@@ -215,9 +228,16 @@ class ManagedSchema implements BaseObject {
      * @return
      */
     List<Node> collectDynamicFieldsDefinitions() {
-        schemaDynamicFieldDefinitions = xmlSchema.'**'.findAll { Node node ->
-            node.name() == 'dynamicField'
+        def dynFieldDefs = xmlSchema.'**'.findAll { def node ->
+            boolean isDynFieldDef = false
+            if(node instanceof Node) {
+                isDynFieldDef = node.name() == 'dynamicField'
+            } else {
+                isDynFieldDef = false
+            }
+            return isDynFieldDef
         }
+        return dynFieldDefs
     }
 
     /**
