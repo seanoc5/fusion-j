@@ -16,7 +16,7 @@ import java.util.zip.ZipFile
  */
 class Application implements BaseObject{
     Logger log = Logger.getLogger(this.class.name);
-    public static final List<String> DEFAULT_APP_OBJECTS = "configsets collections dataSources indexPipelines queryPipelines parsers blobs appkitApps features objectGroups links sparkJobs".split(' ')
+    public static final List<String> DEFAULT_APP_OBJECTS = "configsets collections dataSources indexPipelines indexProfiles queryPipelines queryProfiles parsers blobs appkitApps features objectGroups links sparkJobs jobs".split(' ')
 
     def objectsJson = null
     String appName = 'unknown'
@@ -29,17 +29,25 @@ class Application implements BaseObject{
     List fusionApps
     List<Map> collections
     List<Map> dataSources
-    List<Map> indexPipelines
-    List<Map> queryPipelines
+    IndexPipelines indexPipelines
+    List<Map> indexProfiles
+//    List<Map> indexPipelines
+    QueryPipelines queryPipelines
+//    List<Map> queryPipelines
+    List<Map> queryProfiles
     List<Map> parsers
+
     /** list of blob objects -- often zipEntries from an app export zip... */
     List blobObjects = []
     List blobs = []
+
     List<Map> appkitApps
     Map featuresMap         // https://doc.lucidworks.com/fusion/5.5/333/collection-features-api
     List<Map> objectGroups
     List<Map> links
     List<Map> sparkJobs
+    List<Map> jobs
+
     ConfigSetCollection configsets
     Map<String, String> queryRewriteJson = [:]
     Map<String, Object> queryRewriteRules = [:]
@@ -74,14 +82,19 @@ class Application implements BaseObject{
         }
         collections = parsedObjects.collections
         dataSources = parsedObjects.dataSources
-        indexPipelines = parsedObjects.indexPipelines
-        queryPipelines = parsedObjects.queryPipelines
+
+        indexPipelines = new IndexPipelines(this.appName, parsedObjects.indexPipelines)
+        indexProfiles = parsedObjects.indexProfiles
+        queryPipelines = new QueryPipelines(this.appName, parsedObjects.queryPipelines)
+        queryProfiles = parsedObjects.queryProfiles
+
         parsers = parsedObjects.parsers
         blobs = parsedObjects.blobs
         appkitApps = parsedObjects.appkitApps
         featuresMap = parseFeaturesMap(parsedObjects.features)
         objectGroups = parsedObjects.objectGroups
         links = parsedObjects.links
+        jobs = parsedObjects.jobs
         sparkJobs = parsedObjects.sparkJobs
 
         log.debug "loaded application: $this"
@@ -188,14 +201,15 @@ class Application implements BaseObject{
         ZipFile zipFile = new ZipFile(appExportZipFile)
         Enumeration<? extends ZipEntry> entries = zipFile.entries()
         Map<String,String> cfgSets = [:]
-        int LOG_BATCH_SIZE = 100
+        int LOG_BATCH_SIZE = 500
         int counter = 0
         JsonSlurper jsonSlurper = new JsonSlurper()
         entries.each { ZipEntry zipEntry ->
             counter++
-            if(count % LOG_BATCH_SIZE == 0 ) {
-                log.info "$counter) "
+            if(counter % LOG_BATCH_SIZE == 0 ) {
+                log.info "$counter) progress update... working through zipEntry: $zipEntry"
             }
+
             if (zipEntry.name.contains('objects.json')) {
                 objectsJson = extractZipEntryText(zipFile, zipEntry)
                 parsedMap = jsonSlurper.parseText(objectsJson)
@@ -209,7 +223,7 @@ class Application implements BaseObject{
             } else if (zipEntry.name.startsWith('blobs')) {
                 String name = zipEntry.name
                 // todo -- write code to get/store blob object intelligently
-                log.info "\t\t$name) zipEntry "
+                log.debug "\t\t$name) zipEntry "
 //                String content = extractZipEntryText(zipFile, zipEntry)
                 blobObjects << zipEntry
                 log.debug "\t\tBlob object: $zipEntry"
