@@ -9,37 +9,31 @@ import org.apache.log4j.Logger
  * Mix of composite objects (@see ConfigSetCollection) and regular lists/maps
  * We may convert to more explicit composite objects as necessary
  */
-class QueryPipelines implements BaseObject{
+class IndexPipelines implements BaseObject{
     Logger log = Logger.getLogger(this.class.name);
     List<Map> jsonItems
     String appName
 
-/*
-    Pipelines(File appOrJson) {
-        log.info "Parsing source file: ${appOrJson.absolutePath} (app export, or json...)"
-        def parseResult = parseSourceFile(appOrJson)
-    }
-*/
-    QueryPipelines(String applicationName, List<Map<String,Object>> items){
+    IndexPipelines(String applicationName, List<Map<String,Object>> items){
         appName = applicationName
         jsonItems = items
     }
 
     @Override
     def export(File exportFolder) {
-        log.info "export querypipelines (count:${this.jsonItems.size()}) to folder: ${exportFolder.absolutePath}"
+        log.info "export indexPipelines (count:${this.jsonItems.size()}) to folder: ${exportFolder.absolutePath}"
         List<File> exportedFiles = []
         jsonItems.each { Map pipeline ->
             String id = pipeline.id
             // todo -- look at library (apache commons-text??) to sanitize filenames...?
-            String outname = "queryPipeline.${appName}.${id}"
-            File outfile = new File(exportFolder, outname + '.json')
+            String outname = "indexPipeline.${appName}.${id}"
+            File outfile = new File(exportFolder, outname + ".json" )
             // todo -- handle non-text output...
             String jsonText = jsonDefaultOutput.toJson(pipeline)
             String prettyJson = JsonOutput.prettyPrint(jsonText)
             outfile.text = prettyJson
             exportedFiles << outfile
-            log.debug "exported query pipeline with id ($id) to file: ${outfile.absolutePath}"
+            log.debug "exported index pipeline with id ($id) to file: ${outfile.absolutePath}"
 
             def jsStages = pipeline.stages.findAll {((String)it.type).containsIgnoreCase('javascript')}
             jsStages.each {
@@ -48,12 +42,14 @@ class QueryPipelines implements BaseObject{
                 String jsname = "${outname}.javascript.${id}.js"
                 File jsOutfile = new File(exportFolder, jsname)
                 jsOutfile.text = it.script
+//                log.info "wrote javascript (helper) file: ${jsOutfile.absolutePath}"
             }
 
         }
         return exportedFiles
-    }
 
+        return null
+    }
 
     @Override
     def export(FusionClient fusionClient) {
