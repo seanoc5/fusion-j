@@ -9,44 +9,49 @@ import org.apache.log4j.Logger
 import java.util.regex.Pattern
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
+
 /**
  * Fusion Application helper class
  * Mix of composite objects (@see ConfigSetCollection) and regular lists/maps
  * We may convert to more explicit composite objects as necessary
  */
-class Application implements BaseObject{
+class Application extends BaseObject {
     Logger log = Logger.getLogger(this.class.name);
     public static final List<String> DEFAULT_APP_OBJECTS = "configsets collections dataSources indexPipelines indexProfiles queryPipelines queryProfiles parsers blobs appkitApps features objectGroups links sparkJobs jobs".split(' ')
 
-    def objectsJson = null
+    /** Object holding source for loading this app (file, fusion-j client, git repo... */
+    def source
     String appName = 'unknown'
     String appID = 'unknown'
-
+    String fusionVersion
     Map metadata
     List appProperties
-    Map<String,Object> parsedMap
 
+    /** typically we load an objects.json like structure, and one of three top-level structures is called 'objects' which is poo naming, so over describing this source field... */
+    Map<String, Object> exportedObjectsSourceMap
+
+    /** this should only ever be a single item, but leaving as a list in case I am wrong... */
     List fusionApps
-    List<Map> collections
-    List<Map> dataSources
+
+    Collections collections
+    DataSources dataSources
     IndexPipelines indexPipelines
-    List<Map> indexProfiles
-//    List<Map> indexPipelines
     QueryPipelines queryPipelines
-//    List<Map> queryPipelines
-    List<Map> queryProfiles
-    List<Map> parsers
+    /** profiles change structure between F3 and higher, leaving as untyped 'def' for the moment */
+    IndexProfiles indexProfiles
+    def queryProfiles
+    Parsers parsers
 
     /** list of blob objects -- often zipEntries from an app export zip... */
     List blobObjects = []
-    List blobs = []
+    Blobs blobs
 
-    List<Map> appkitApps
-    Map featuresMap         // https://doc.lucidworks.com/fusion/5.5/333/collection-features-api
-    List<Map> objectGroups
-    List<Map> links
-    List<Map> sparkJobs
-    List<Map> jobs
+    AppKits appkitApps
+    Features features
+    ObjectGroups objectGroups
+    Links links
+    SparkJobs sparkJobs
+    Jobs jobs
 
     ConfigSetCollection configsets
     Map<String, String> queryRewriteJson = [:]
@@ -69,42 +74,79 @@ class Application implements BaseObject{
     Application(File appOrJson) {
         log.info "Parsing source file: ${appOrJson.absolutePath} (app export, or json...)"
         def parseResult = parseSourceFile(appOrJson)
+//        this.jsonItems = parseResult
 
         // todo -- move all this setup code to a more flexible method
-        Map<String, Object> parsedObjects = parsedMap.objects
+        Map<String, Object> parsedObjects = exportedObjectsSourceMap.objects
 
-        this.metadata = parsedMap.metadata
-        this.appProperties = parsedObjects['properties']
-
-        if (parsedMap.configsets) {
-            configsets = new ConfigSetCollection(((Map) parsedMap.configsets), appName)
-            log.info "\t\tGot configsets from parsed source file..."
+        if (parsedObjects.metadata) {
+            this.metadata = exportedObjectsSourceMap.metadata
         }
-        collections = parsedObjects.collections
-        dataSources = parsedObjects.dataSources
+        if (parsedObjects.appProperties) {
+            this.appProperties = parsedObjects['properties']
+        }
 
-        indexPipelines = new IndexPipelines(this.appName, parsedObjects.indexPipelines)
-        indexProfiles = parsedObjects.indexProfiles
-        queryPipelines = new QueryPipelines(this.appName, parsedObjects.queryPipelines)
-        queryProfiles = parsedObjects.queryProfiles
+        if (exportedObjectsSourceMap.configsets) {
+            configsets = new ConfigSetCollection((Map) exportedObjectsSourceMap.configsets, appName)
+        } else {
+            log.info "\t\tNo configsets, just a subset of loading an app...?"
+        }
+        if (parsedObjects.collections) {
+            collections = new Collections(appName, (List) parsedObjects.collections)
+        }
+        if (parsedObjects.dataSources) {
+            dataSources = new DataSources(appName, parsedObjects.dataSources)
+        }
+        if (parsedObjects.indexPipelines) {
+            indexPipelines = new IndexPipelines(appName, parsedObjects.indexPipelines)
+        }
+        if (parsedObjects.indexProfiles) {
+            indexProfiles = new IndexProfiles(appName, parsedObjects.indexProfiles)
+        }
+        if (parsedObjects.queryPipelines) {
+            queryPipelines = new QueryPipelines(appName, parsedObjects.queryPipelines)
+        }
+        if (parsedObjects.queryProfiles) {
+            queryProfiles = new QueryProfiles(appName, parsedObjects.queryProfiles)
+        }
+        if (parsedObjects.parsers) {
+            parsers = new Parsers(appName, parsedObjects.parsers)
+        }
+        if (parsedObjects.blobs) {
+            blobs = new Blobs(appName, parsedObjects.blobs)
+        } else {
+            log.info "\t\tno blobs available (subset of appexport or pre F4...?)"
+        }
+        if (parsedObjects.appkitApps) {
+            appkitApps = new AppKits(appName, parsedObjects.appkitApps)
+        } else {
+            log.info "\t\tno Appkit apps found; this is fine--unless you have appkit apps...?"
+        }
+        if (parsedObjects.features) {
+            features = new Features(appName, parsedObjects.features)
+        }
 
-        parsers = parsedObjects.parsers
-        blobs = parsedObjects.blobs
-        appkitApps = parsedObjects.appkitApps
-        featuresMap = parseFeaturesMap(parsedObjects.features)
-        objectGroups = parsedObjects.objectGroups
-        links = parsedObjects.links
-        jobs = parsedObjects.jobs
-        sparkJobs = parsedObjects.sparkJobs
+        if (parsedObjects.objectGroups) {
+            objectGroups = new ObjectGroups(appName, parsedObjects.objectGroups)
+        }
+        if (parsedObjects.links) {
+            links = new Links(appName, parsedObjects.links)
+        }
+        if (parsedObjects.jobs) {
+            jobs = new Jobs(appName, parsedObjects.jobs)
+        }
+        if (parsedObjects.sparkJobs) {
+            sparkJobs = new SparkJobs(appName, parsedObjects.sparkJobs)
+        }
 
-        log.debug "loaded application: $this"
+        log.info "loaded application: $this"
     }
 
-    def export(File destinationFile, Pattern thingsToExport){
+    def export(File destinationFile, Pattern thingsToExport) {
         log.info "more code here: export application with things matching pattern: ($thingsToExport)"
     }
 
-    def export(FusionClient destinationClient, Pattern thingsToExport){
+    def export(FusionClient destinationClient, Pattern thingsToExport) {
         log.info "more code here: export application with things matching pattern: ($thingsToExport)"
     }
 
@@ -131,26 +173,44 @@ class Application implements BaseObject{
             appProperties = parsedMap.properties
             parsedMetadata.appProperties = appProperties
             metadata = parsedMap.metadata
+            Integer majorVersion = null
+            fusionVersion = metadata.fusionVersion
+            List verParts = fusionVersion.split('\\.')
+            if (verParts) {
+                majorVersion = java.lang.Integer.parseInt(verParts[0])
+                if (!majorVersion || majorVersion < 4) {
+                    if (source instanceof File) {
+                        appName = ((File) source).name
+                        log.info "\t\tNo fusion apps in this version ($fusionVersion), setting name to source fileName: $appName"
+                    } else {
+                        appName = fusionVersion
+                        log.info "\t\tNo fusion apps in this version ($fusionVersion), setting name to version: $appName"
+                    }
+                }
+            }
+            if (objects.fusionApps) {
+                log.info "We have a fusion app export/zip (assume fusion 4 and above...)"
+                fusionApps = objects.fusionApps
+                if (fusionApps.size() == 1) {
+                    appName = fusionApps.name[0]
+                    appID = fusionApps.id[0]
+                    parsedMetadata.appName = appName
+                    parsedMetadata.appID = appID
+                } else {
+                    log.warn "Expected one (1) app in App export!?!?! But we have (${fusionApps.size()} ... Mind blown... how....why... who? Consider everything from here on suspect!!"
+                }
+            } else if (majorVersion < 4) {
+                log.debug "Major version ($majorVersion) suggests version before Fusion 4, and thus no app info to parse"
+            } else {
+                log.debug "No fusionApps in export!!?! Major version ($majorVersion) seems >= 4, which SHOULD have app info..."
+            }
+
             parsedMetadata.metadata = metadata
         } else {
             log.info "\t\tGot some unxpected source map ${parsedMap.keySet()}, hoping we were called with [objects.json].objects (subset)...? won't have full metadata "
             objects = parsedMap
         }
 
-        if (objects.fusionApps) {
-            log.info "We have a fusion app export/zip (assume fusion 4 and above...)"
-            fusionApps = objects.fusionApps
-            if (fusionApps.size() == 1) {
-                appName = fusionApps.name[0]
-                appID = fusionApps.id[0]
-                parsedMetadata.appName = appName
-                parsedMetadata.appID = appID
-            } else {
-                log.warn "Expected one (1) app in App export!?!?! But we have (${fusionApps.size()} ... Mind blown... how....why... who? Consider everything from here on suspect!!"
-            }
-        } else {
-            log.warn "No fusionApps in export!!?! What is this, year 2016??"
-        }
         parsedMetadata
     }
 
@@ -170,7 +230,7 @@ class Application implements BaseObject{
         Map parsed = null
         Map<String, Object> configsets = [:]
         if (appOrJson?.exists()) {
-            objectsJson = null      //todo - remove?
+//            objectsJson = null      //todo - remove?
             if (appOrJson?.exists() && appOrJson.isFile()) {
                 if (appOrJson.name.endsWith('.zip')) {
                     loadFromAppExportArchive(appOrJson)
@@ -197,23 +257,24 @@ class Application implements BaseObject{
     }
 
     public void loadFromAppExportArchive(File appExportZipFile) {
-        log.info "Load app from export ZIP archive: ${appExportZipFile.absolutePath} ..."
+        log.info "\t\tLoad app from export ZIP archive: ${appExportZipFile.absolutePath} ..."
+        source = appExportZipFile
         ZipFile zipFile = new ZipFile(appExportZipFile)
         Enumeration<? extends ZipEntry> entries = zipFile.entries()
-        Map<String,String> cfgSets = [:]
+        Map<String, String> cfgSets = [:]
         int LOG_BATCH_SIZE = 500
         int counter = 0
         JsonSlurper jsonSlurper = new JsonSlurper()
         entries.each { ZipEntry zipEntry ->
             counter++
-            if(counter % LOG_BATCH_SIZE == 0 ) {
-                log.info "$counter) progress update... working through zipEntry: $zipEntry"
+            if (counter % LOG_BATCH_SIZE == 0) {
+                log.info "\t\t$counter) progress update... working through zipEntry: $zipEntry"
             }
 
             if (zipEntry.name.contains('objects.json')) {
-                objectsJson = extractZipEntryText(zipFile, zipEntry)
-                parsedMap = jsonSlurper.parseText(objectsJson)
-                log.debug "\t\textracted json text from zip entry: ${((Map)parsedMap).keySet()}"
+                String objectsJson = extractZipEntryText(zipFile, zipEntry)
+                exportedObjectsSourceMap = jsonSlurper.parseText(objectsJson)
+                log.debug "\t\textracted json text from zip entry: ${((Map) exportedObjectsSourceMap).keySet()}"
             } else if (zipEntry.name.contains('configsets')) {
                 String name = zipEntry.name
                 String content = extractZipEntryText(zipFile, zipEntry)
@@ -243,25 +304,24 @@ class Application implements BaseObject{
             }
             log.debug "ZipEntry: $zipEntry"
         }
-        Map parsedMetadata = parseAppMetadata(parsedMap)
-        log.info "Parsed app metadata: ${parsedMetadata.keySet()}"
+        Map parsedMetadata = parseAppMetadata(exportedObjectsSourceMap)
+        log.info "\t\tParsed app metadata: ${parsedMetadata.keySet()}"
 
         if (cfgSets) {
             configsets = new ConfigSetCollection(cfgSets, this.appName)
             log.debug "configsets: $configsets"
         }
-        log.info "Config sets (${configsets.toString()}) and parsed Map keyset: (${parsedMap.keySet()})"
+        log.info "\t\tConfig sets (${configsets.toString()}) and parsed Map keyset: (${exportedObjectsSourceMap.keySet()})"
     }
 
-    public Object loadFromObjectsJsonFile(File appOrJson) {
-        String jsonString = appOrJson.text
-        log.info "Get json from json file: $appOrJson -- length: ${jsonString.size()} characters"
-        parsedMap = new JsonSlurper().parseText(jsonString)
-        log.warn "More code here: do more parsing"
-        Map parsedMetadata = parseAppMetadata(parsedMap)
+    public Object loadFromObjectsJsonFile(File jsonSourceFile) {
+        String jsonString = jsonSourceFile.text
+        source = jsonSourceFile
+        log.info "\t\tGet json from json file: $jsonSourceFile -- length: ${jsonString.size()} characters"
+        exportedObjectsSourceMap = new JsonSlurper().parseText(jsonString)
+        Map parsedMetadata = parseAppMetadata(exportedObjectsSourceMap)
         log.debug "Parsed app metadata: $parsedMetadata"
-
-
+        return parsedMetadata
     }
 
     /**
@@ -281,14 +341,25 @@ class Application implements BaseObject{
 
     @Override
     public String toString() {
-        return "Application";
+        if (!appName) {
+            log.warn "No appName present??"
+        }
+        Map<String, String> infoMap = toInfoMap()
+        String s = infoMap.toString()
+        return s
     }
 
-    Map<String, List<Feature>> parseFeaturesMap(Map featuresMap) {
-        Map<String, List<Feature>> featuresParsed = featuresMap.collectEntries { String name, List items ->
-            ["$name": new Feature(items)]
-        }
-
+    public Map<String, String> toInfoMap() {
+        Map<String, String> infoMap = [
+                name          : appName,
+                source        : source,
+                collections   : collections?.size(),
+                dataSources   : dataSources.size(),
+                indexPipelines: indexPipelines.size(),
+                queryPipelines: queryPipelines.size(),
+                parsers       : parsers.size(),
+        ]
+        infoMap
     }
 
 }

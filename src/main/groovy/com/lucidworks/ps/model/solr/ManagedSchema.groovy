@@ -12,7 +12,7 @@ import java.util.regex.Pattern
 /**
  * wrapper class to help with solr schema parsing and operations
  */
-class ManagedSchema implements BaseObject {
+class ManagedSchema extends BaseObject {
     public static final Pattern OVERRIDE_FIELDNAMES = ~/id|_version_|_raw_content_|_root_/
     Logger log = Logger.getLogger(this.class.name);
     /** source of content, if string, these will be equal, if file, or url, that will be different */

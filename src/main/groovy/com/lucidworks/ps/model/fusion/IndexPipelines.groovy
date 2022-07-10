@@ -1,6 +1,6 @@
 package com.lucidworks.ps.model.fusion
 
-import com.lucidworks.ps.clients.FusionClient
+
 import com.lucidworks.ps.model.BaseObject
 import groovy.json.JsonOutput
 import org.apache.log4j.Logger
@@ -9,21 +9,20 @@ import org.apache.log4j.Logger
  * Mix of composite objects (@see ConfigSetCollection) and regular lists/maps
  * We may convert to more explicit composite objects as necessary
  */
-class IndexPipelines implements BaseObject{
+class IndexPipelines extends BaseObject {
     Logger log = Logger.getLogger(this.class.name);
-    List<Map> jsonItems
+//    List<Map> jsonItems
     String appName
 
     IndexPipelines(String applicationName, List<Map<String,Object>> items){
-        appName = applicationName
-        jsonItems = items
+        super(applicationName, items)
     }
 
     @Override
     def export(File exportFolder) {
-        log.info "export indexPipelines (count:${this.jsonItems.size()}) to folder: ${exportFolder.absolutePath}"
+        log.info "export indexPipelines (count:${this.srcJsonList.size()}) to folder: ${exportFolder.absolutePath}"
         List<File> exportedFiles = []
-        jsonItems.each { Map pipeline ->
+        srcJsonList.each { Map pipeline ->
             String id = pipeline.id
             // todo -- look at library (apache commons-text??) to sanitize filenames...?
             String outname = "indexPipeline.${appName}.${id}"
@@ -52,16 +51,9 @@ class IndexPipelines implements BaseObject{
     }
 
     @Override
-    def export(FusionClient fusionClient) {
-        throw new RuntimeException("Export to live fusion client not implemented yet...")
-        return null
-    }
+    Map<String, Object> assessItem(def item) {
+        Map itemAssessment = super.assessItem(item)
 
-
-    Map<String, Object> parseSourceFile(File appOrJson) {
-        Application app = new Application(appOrJson)
-        log.warn "refactor... assume app is calling the creation of a new collections set..."
-        jsonItems = app.queryPipelines
     }
 
 

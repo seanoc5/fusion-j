@@ -11,7 +11,7 @@ import java.util.regex.Pattern
 /**
  * wrapper class to help with solr schema parsing and operations
  */
-class ConfigSet implements BaseObject{
+class ConfigSet extends BaseObject{
     public static final Pattern SOLR_CONFIG_PATTERN = ~/\/solrconfig.xml/
     Logger log = Logger.getLogger(this.class.name);
     public static final Pattern LANG_FOLDER_PATTERN = ~/\/lang\/.+/

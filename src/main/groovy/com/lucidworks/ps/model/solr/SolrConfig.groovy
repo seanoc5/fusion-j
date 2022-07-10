@@ -16,7 +16,7 @@ import org.apache.log4j.Logger
  * wrapper class ato provide 'solrconfig.xml' specific processing and structure
  * @NOTE assuming XML format only, JSON format may come in the future...
  */
-class SolrConfig implements BaseObject {
+class SolrConfig extends BaseObject {
     Logger log = Logger.getLogger(this.class.name);
     String sourceContent
     def sourceURI           // optional? useful??

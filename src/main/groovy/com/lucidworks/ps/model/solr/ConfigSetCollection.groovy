@@ -10,7 +10,7 @@ import java.util.regex.Pattern
 /**
  * wrapper class to help with solr schema parsing and operations
  */
-class ConfigSetCollection implements BaseObject{
+class ConfigSetCollection extends BaseObject{
     Logger log = Logger.getLogger(this.class.name);
     String deploymentName          // can be empty if getting from solr direcltly (i.e. all apps all configsets...?)
     Map<String, List<ConfigSet>> configsetMap = [:]
