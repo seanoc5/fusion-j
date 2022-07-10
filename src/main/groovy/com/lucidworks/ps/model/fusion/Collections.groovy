@@ -1,9 +1,8 @@
 package com.lucidworks.ps.model.fusion
 
-import com.lucidworks.ps.clients.FusionClient
+
 import com.lucidworks.ps.model.BaseObject
 import org.apache.log4j.Logger
-
 /**
  * Fusion Application helper class
  * Mix of composite objects (@see ConfigSetCollection) and regular lists/maps
@@ -26,15 +25,16 @@ class Collections extends BaseObject {
 
     @Override
     def export(File exportFolder) {
+        def outFile = super.export(exportFolder)
         log.info "export collections to folder: ${exportFolder.absolutePath}"
-        return null
+        return outFile
     }
 
-    @Override
-    def export(FusionClient fusionClient) {
-        throw new RuntimeException("Export to live fusion client not implemented yet...")
-        return null
-    }
+//    @Override
+//    def export(FusionClient fusionClient) {
+//        throw new RuntimeException("Export to live fusion client not implemented yet...")
+//        return null
+//    }
 
     @Override
     Map<String, Object> assessItem(def collection) {

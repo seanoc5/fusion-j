@@ -10,8 +10,6 @@ import org.apache.log4j.Logger
  */
 class DataSources extends BaseObject {
     Logger log = Logger.getLogger(this.class.name);
-//    String appName = 'n.a.'
-//    List<Map> jsonItems
 
 
     DataSources(String applicationName, List<Map<String, Object>> items) {

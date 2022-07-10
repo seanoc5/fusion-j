@@ -34,11 +34,11 @@ class ConfigSetCollection extends BaseObject{
     @Override
     def export(File exportFolder) {
         configsetMap.each { String name, ConfigSet configSet ->
-            log.debug "export configset ($name): ${configSet}"
+            log.info "\t\texport configset ($name): ${configSet}"
             configSet.export(exportFolder)
             log.debug "\t\t exported configset $name"
         }
-        log.info "exported config sets keys: ${configsetMap.keySet()}"
+        log.info "exported config sets with  keys: ${configsetMap.keySet()}"
     }
 
     @Override

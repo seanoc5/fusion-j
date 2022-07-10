@@ -58,6 +58,9 @@ public class BaseObject {
     }
 
     def export(File exportFolder) {
+        log.debug "\t\tExport item (${itemType})...."
+        String name = getItemName() +'.json'
+        File outFile = new File(exportFolder, name)
         if(srcJsonList) {
             srcJsonList.each {
                 log.info "$it"
@@ -69,6 +72,7 @@ public class BaseObject {
         } else {
             log.warn "Unknown thing type to export: $this (no srcJsonMap or srcJsonList...??)"
         }
+        return outFile
     }
 
     def export(FusionClient fusionClient) {
@@ -134,26 +138,36 @@ public class BaseObject {
     }
 
 
+    String getItemName(){
+        String name = 'n.a.'
+        if(srcJsonMap){
+            name = getItemName(srcJsonMap)
+        } else if(srcJsonList) {
+            name = getItemName(srcJsonList)
+        } else {
+            throw new IllegalArgumentException("Unknown item type to get name!!")
+        }
+        return name
+    }
+
     /**
      * convenience method to get id or name, or some other value from the 'item' we are assessing
       * @param item
      * @return appropriate name/id for this item
      */
-    String getItemName(Object item) {
+    String getItemName(Map item) {
         String name = 'n.a.'
-        if (item instanceof Map) {
             if (item.name) {
                 name = item.name
             } else if (item.id) {
                 name = item.id
             }
-        } else if (item instanceof Collection) {
-            log.warn "Collection name...?"
-        } else {
-            log.warn "get unknown item type name (override getItemName for this item??) ${this.getClass().simpleName}"
+        return name
+    }
 
-        }
-
+    String getItemName(List item){
+        log.warn "Unknown how to get name from a list..."
+        String name = item.toString().md5()
         return name
     }
 }

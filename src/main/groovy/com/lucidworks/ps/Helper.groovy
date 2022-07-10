@@ -4,6 +4,7 @@ import org.apache.log4j.Logger
 
 import java.text.DateFormat
 import java.text.SimpleDateFormat
+
 //import java.security.InvalidParameterException
 
 /**
@@ -20,6 +21,15 @@ class Helper {
      */
     static File getOrMakeDirectory(String dirPath) {
         File folder = new File(dirPath)
+        getOrMakeDirectory(folder)
+    }
+
+    static File getOrMakeDirectory(File parentFolder, String subFolder) {
+        File folder = new File(parentFolder, subFolder)
+        getOrMakeDirectory(folder)
+    }
+
+    static File getOrMakeDirectory(File folder) {
         if (folder.exists()) {
             if (folder.isDirectory()) {
                 log.debug "Folder (${folder.absolutePath} exists, which is good"
@@ -49,7 +59,7 @@ class Helper {
         String s = dateFormat.format(date)
     }
 
-    static String sanitizeFilename(String name, String substitute = '_', String regex = "[^a-zA-Z0-9\\.\\-]"){
+    static String sanitizeFilename(String name, String substitute = '_', String regex = "[^a-zA-Z0-9\\.\\-]") {
         String sanitized = name.replaceAll(regex, substitute);
     }
 }
