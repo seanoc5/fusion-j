@@ -787,7 +787,12 @@ class FusionClient {
         HttpResponse<String> response = httpClient.send(request, bodyHandler)
         FusionResponseWrapper fusionResponse = new FusionResponseWrapper(request, response)
 
-        responses << fusionResponse         // add this response to the client's collection of responses
+        responses << fusionResponse // add this response to the client's collection of responses
+        if(fusionResponse.wasSuccess()) {
+            log.debug "successful request/response: $fusionResponse"
+        } else {
+            log.warn "UNSUCCESSFUL request/response: $fusionResponse"
+        }
         return fusionResponse
     }
 
@@ -818,11 +823,13 @@ class FusionClient {
         String collName = collection.id
         JsonBuilder jsonBuilder = new JsonBuilder([id: collName])
         String jsonToIndex = jsonBuilder.toString()
+        log.warn "REvisit collection creation process, this call is doing a naive/vanilla collection creation: $jsonToIndex"
         try {
             String url = "$fusionBase/api/apps/${appName}/collections"      // todo: add defaultFeatures?
             log.info "\t Create COLLECTION ($collName) url: $url -- Json text size::\t ${jsonToIndex.size()}"
             HttpRequest request = buildPostRequest(url, jsonToIndex)
             responseWrapper = sendFusionRequest(request)
+            log.info "\t\tcreate collection respose: $responseWrapper"
         } catch (IllegalArgumentException iae) {
             log.error "IllegalArgumentException: $iae"
         }
