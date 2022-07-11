@@ -196,8 +196,14 @@ class ManagedSchema extends BaseObject {
 
 
     def collectSchemaFieldTypes() {
-        def fieldTypes = xmlSchema.'**'.findAll { Node node ->
-            node.name() == 'fieldType'
+        def fieldTypes = xmlSchema.'**'.findAll { Object node ->
+            boolean match = false
+            if(node instanceof  Node) {
+                match = (node.name() == 'fieldType')
+            } else {
+                match= false
+            }
+            return match
         }
         return fieldTypes
     }
@@ -217,6 +223,7 @@ class ManagedSchema extends BaseObject {
                 }
                 nodeName == 'field'
             }
+            log.debug "\t\tGathered fields: $fields"
         } catch (Exception e) {
             log.error "Error: $e"
         }
@@ -233,6 +240,7 @@ class ManagedSchema extends BaseObject {
             if(node instanceof Node) {
                 isDynFieldDef = node.name() == 'dynamicField'
             } else {
+                log.debug "Not a node? xml error or random text? ($node)"
                 isDynFieldDef = false
             }
             return isDynFieldDef

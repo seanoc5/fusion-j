@@ -17,7 +17,7 @@ import org.apache.log4j.Logger
  */
 class Features extends BaseObject {
     Logger log = Logger.getLogger(this.class.name);
-    List<Map<String, Object>> items = []
+//    List<Map<String, Object>> items = []
 
     /**
      * Features from json (app export or rest api call) are a map, different from most cases
@@ -28,5 +28,17 @@ class Features extends BaseObject {
         super(applicationName, map)
     }
 
+    @Override
+    def export(File exportFolder) {
+        String name = "${appName}.features.json"
+        File outFile = new File(exportFolder, name)
+        outFile
 
+        return super.export(exportFolder)
+    }
+
+    @Override
+    String getItemName(Map item) {
+        String name = "${appName}-features"
+    }
 }

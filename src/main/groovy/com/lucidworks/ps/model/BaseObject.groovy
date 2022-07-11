@@ -2,7 +2,9 @@ package com.lucidworks.ps.model
 
 import com.lucidworks.ps.clients.FusionClient
 import groovy.json.JsonGenerator
+import groovy.json.JsonOutput
 import org.apache.log4j.Logger
+
 /**
  * Base object to facilitate exporting to various destinations (filesystem, fusion instance,...)
  */
@@ -63,11 +65,11 @@ public class BaseObject {
 
     def export() {
         log.info "Just a 'preview' -- not functional, consider calling export with exportDir param..."
-        if(srcJsonList) {
+        if (srcJsonList) {
             srcJsonList.each {
                 log.info "$it"
             }
-        } else if(srcJsonMap){
+        } else if (srcJsonMap) {
             srcJsonMap.each { def key, def val ->
                 log.info "Key ($key) --> val ($val)"
             }
@@ -78,17 +80,22 @@ public class BaseObject {
 
     def export(File exportFolder) {
         log.debug "\t\tExport item (${itemType})...."
-        if(srcJsonList) {
+        File outFile
+        if (srcJsonList) {
             srcJsonList.each {
-                String name = getItemName(it) +'.json'
-                File outFile = new File(exportFolder, name)
-                log.info "$it"
+                String name = getItemName(it) + '.json'
+                outFile = new File(exportFolder, name)
+                String json = toJson(it)
+                log.info "$itemType::$name) ${it.size()}"
+                outFile.text = json
             }
-        } else if(srcJsonMap){
+        } else if (srcJsonMap) {
             srcJsonMap.each { def key, def val ->
-                String name = getItemName(val) +'.json'
-                File outFile = new File(exportFolder, name)
+                String name = "${key}.json"
+                outFile = new File(exportFolder, name)
+                String json = toJson(it)
                 log.info "Key ($key) --> val ($val)"
+                outFile.text = json
             }
         } else {
             log.warn "Unknown thing type to export: $this (no srcJsonMap or srcJsonList...??)"
@@ -100,17 +107,45 @@ public class BaseObject {
         throw new IllegalArgumentException("Not implemented yet!!")
     }
 
+    String toJson(boolean prettyPrint = true) {
+        String json = null
+        if (srcJsonMap) {
+            json = jsonDefaultOutput.toJson(srcJsonMap)
+        } else if (srcJsonList) {
+            json = jsonDefaultOutput.toJson(srcJsonList)
+        } else {
+            String msg = "Unknown object type (no srcJsonMap or srcJsonList to convert to JSON--did we miss overriding 'toJson' method in a child/extension class???"
+            log.error "$msg"
+            throw new IllegalArgumentException(msg)
+        }
+        if (prettyPrint) {
+            log.debug "convert to pretty print..."
+            json = JsonOutput.prettyPrint(json)
+        }
+        return json
+    }
+
+    String toJson(def item, boolean prettyPrint = true) {
+        String json = jsonDefaultOutput.toJson(item)
+        if (prettyPrint) {
+            log.debug "convert to pretty print..."
+            json = JsonOutput.prettyPrint(json)
+        }
+        return json
+    }
+
+
     Map<String, Object> assessComplexity() {
         Integer sumComplexity = Integer.valueOf(0)
         Map complexityAssessment = [assessmentType: this.itemType, size: size(), complexity: sumComplexity, items: []]
-        if(srcJsonList) {
+        if (srcJsonList) {
             log.info "Assess complexity (${itemType}) with ${size()} LIST Items..."
             srcJsonList.each {
                 def assessment = assessItem(it)
                 sumComplexity += assessment.complexity
                 complexityAssessment.items << assessment
             }
-        } else if(srcJsonMap) {
+        } else if (srcJsonMap) {
 //            log.warn "\t\t(${this.itemType}) Map processing... not implemented yet...?"
             log.info "Assess complexity (${itemType}) with ${size()} MAP entries..."
             srcJsonMap.each { def key, def val ->
@@ -123,7 +158,7 @@ public class BaseObject {
                 }
                 complexityAssessment.items << assessment
             }
-        } else if(this.itemType.startsWith('ConfigSet')){
+        } else if (this.itemType.startsWith('ConfigSet')) {
             log.info "Base object assessComplexity() called, but all assessment should be done in child class method... (ignore me) "
         } else {
 
@@ -142,7 +177,7 @@ public class BaseObject {
     Map<String, Object> assessItem(def item) {
         String name = getItemName(item)
         log.debug "\t\t\tBaseObject assessItem: $name -- type: ${item.getClass().simpleName}"
-        Map itemAssessment = [name: name, size: size(), complexity: 0, items:[]]
+        Map itemAssessment = [name: name, size: size(), complexity: 0, items: []]
     }
 
     /**
@@ -152,7 +187,7 @@ public class BaseObject {
      * @return map with assessment information
      */
     Map<String, Object> assessItem(String itemName, def item) {
-        Map itemAssessment = [name:itemName, size: size(), complexity: 0, items:[]]
+        Map itemAssessment = [name: itemName, size: size(), complexity: 0, items: []]
     }
 
     /** convenience method to get the count of 'items' we are dealing with, part of complexity assessment */
@@ -178,18 +213,18 @@ public class BaseObject {
 
     /**
      * convenience method to get id or name, or some other value from the 'item' we are assessing
-      * @param item
+     * @param item
      * @return appropriate name/id for this item
      */
     String getItemName(Map item) {
         String name = 'n.a.'
-            if (item.name) {
-                name = item.name
-            } else if (item.id) {
-                name = item.id
-            } else {
-                log.warn "$itemType) Could not find a suitable name source (no 'name', or 'id' in map: ${item.keySet()}"
-            }
+        if (item.name) {
+            name = item.name
+        } else if (item.id) {
+            name = item.id
+        } else {
+            log.warn "$itemType) Could not find a suitable name source (no 'name', or 'id' in map: ${item.keySet()}"
+        }
         return name
     }
 
