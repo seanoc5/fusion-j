@@ -1,5 +1,6 @@
 package com.lucidworks.ps.model
 
+import com.lucidworks.ps.Helper
 import com.lucidworks.ps.clients.FusionClient
 import groovy.json.JsonGenerator
 import groovy.json.JsonOutput
@@ -83,17 +84,19 @@ public class BaseObject {
         File outFile
         if (srcJsonList) {
             srcJsonList.each {
-                String name = getItemName(it) + '.json'
-                outFile = new File(exportFolder, name)
+                String name = getItemName(it)
+                name = Helper.sanitizeFilename(name)
+//                if(name.endsWith()
+                outFile = new File(exportFolder, name+'.json')
                 String json = toJson(it)
                 log.info "$itemType::$name) ${it.size()}"
                 outFile.text = json
             }
         } else if (srcJsonMap) {
             srcJsonMap.each { def key, def val ->
-                String name = "${key}.json"
+                String name = Helper.sanitizeFilename("${key}.json")
                 outFile = new File(exportFolder, name)
-                String json = toJson(it)
+                String json = toJson(val)
                 log.info "Key ($key) --> val ($val)"
                 outFile.text = json
             }

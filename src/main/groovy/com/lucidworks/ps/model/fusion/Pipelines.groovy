@@ -71,17 +71,15 @@ class Pipelines extends BaseObject {
             def jsStages = pipeline.stages.findAll { ((String) it.type).containsIgnoreCase('javascript') }
             jsStages.each {
                 String stageId = it.id
-                log.debug "export javascript for this stage ($stageId)"
+//                log.debug "export javascript for this stage ($stageId)"
                 String jsname = "${outname}.javascript.${id}.js"
                 File jsOutfile = new File(exportFolder, jsname)
                 jsOutfile.text = it.script
-//                log.info "wrote javascript (helper) file: ${jsOutfile.absolutePath}"
+                log.info "\t\twrote javascript (helper) file: ${jsOutfile.absolutePath}"
             }
 
         }
         return exportedFiles
-
-        return null
     }
 
     @Override

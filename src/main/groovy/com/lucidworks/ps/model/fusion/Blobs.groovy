@@ -15,6 +15,12 @@ class Blobs extends BaseObject {
     }
 
     @Override
+    def export(File exportFolder) {
+        log.info "Todo: more code to handle exporting  App($appName)  blobs..."
+        return super.export(exportFolder)
+    }
+
+    @Override
     Map<String, Object> assessItem(def item) {
         Map assessItem = super.assessItem(item)
         String contentType = item.contentType
