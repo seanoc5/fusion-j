@@ -86,10 +86,11 @@ class Application extends BaseObject {
             this.appProperties = parsedObjects['properties']
         }
 
-        if (exportedObjectsSourceMap.configsets) {
+        if (parsedObjects.configsets) {
+            log.warn "Found configsets in parsedObjects json...??!? this is unexpected, but we will try to process anyhow...."
             configsets = new ConfigSetCollection((Map) exportedObjectsSourceMap.configsets, appName)
         } else {
-            log.info "\t\tNo configsets, just a subset of loading an app...?"
+            log.debug "\t\tNo configsets in parsedObjects source (this is expected)"
         }
         if (parsedObjects.collections) {
             collections = new Collections(appName, (List) parsedObjects.collections)
@@ -143,17 +144,16 @@ class Application extends BaseObject {
     }
 
     def export(File destinationFile, Pattern thingsToExport) {
-        log.info "more code here: export application with things matching pattern: ($thingsToExport)"
+        log.warn "more code here: export application with things matching pattern: ($thingsToExport)"
     }
 
     def export(FusionClient destinationClient, Pattern thingsToExport) {
-        log.info "more code here: export application with things matching pattern: ($thingsToExport)"
+        log.warn "more code here: export application with things matching pattern: ($thingsToExport)"
     }
 
     @Override
     def export(File exportFolder) {
-        log.info "export Application to folder: ${exportFolder.absolutePath}"
-
+        log.warn "export Application to folder: ${exportFolder.absolutePath}"
         return null
     }
 
@@ -305,7 +305,7 @@ class Application extends BaseObject {
             log.debug "ZipEntry: $zipEntry"
         }
         Map parsedMetadata = parseAppMetadata(exportedObjectsSourceMap)
-        log.info "\t\tParsed app metadata: ${parsedMetadata.keySet()}"
+        log.debug "\t\tParsed app metadata: ${parsedMetadata.keySet()}"
 
         if (cfgSets) {
             configsets = new ConfigSetCollection(cfgSets, this.appName)

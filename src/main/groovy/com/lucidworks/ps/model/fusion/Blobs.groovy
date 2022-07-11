@@ -15,9 +15,25 @@ class Blobs extends BaseObject {
     }
 
     @Override
-    Map<String, Object> assessItem(Object item) {
-        log.info "More stuff here for Blobs...?"
+    Map<String, Object> assessItem(def item) {
         Map assessItem = super.assessItem(item)
+        String contentType = item.contentType
+        if(contentType ==~ /(text|application.(json|zip)).*/){
+            String msg = "This content type($contentType) is easy, no complexity... "
+            assessItem.items << msg
+            log.debug msg
+        } else {
+            log.info "More stuff here for Blob with contentType: $contentType"
+            int cmplx = 1
+            String msg = "Unknown blob contenttype($contentType), defaulting to complexity: $cmplx"
+            assessItem.complexity = cmplx
+            assessItem.items << msg
+        }
+
         return assessItem
+    }
+
+    def loadBlobs(){
+        throw new IllegalArgumentException("Incomplete code -- add logic for loading blobs from... somewhere...?")
     }
 }

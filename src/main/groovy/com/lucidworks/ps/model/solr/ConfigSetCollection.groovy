@@ -8,7 +8,7 @@ import java.util.regex.Matcher
 import java.util.regex.Pattern
 
 /**
- * wrapper class to help with solr schema parsing and operations
+ * wrapper object to bundle groups of config sets
  */
 class ConfigSetCollection extends BaseObject{
     Logger log = Logger.getLogger(this.class.name);
@@ -16,12 +16,59 @@ class ConfigSetCollection extends BaseObject{
     Map<String, List<ConfigSet>> configsetMap = [:]
     // first group is the configset name (collection-name), second group is the path to use in the configset
     public static final Pattern DEFAULT_KEY_PATTERN = ~/.*configsets\/([^\/]+)(\/.*)/
+    int SIZE_DIVIDER = 10
 
 
     ConfigSetCollection(Map configsetCollection, String deploymentName) {
         Integer collectionSize = parseConfigsetCollection(configsetCollection, deploymentName)
         log.debug "Fusion configsetCollection (with ${configsetCollection.size()} source items) constructor, with (${collectionSize} grouped config sets)..."
     }
+
+
+    @Override
+    Map<String, Object> assessComplexity() {
+        log.warn "todo -- add more code to assess complexity of migrating solr from older version to newer..."
+
+        Map assessment = super.assessComplexity()
+        assessment.size = configsetMap.size()
+        int sizeComplexity = configsetMap.size() / SIZE_DIVIDER
+        if(sizeComplexity> 0){
+            String msg = "Configsets have ${configsetMap.size()} items, which we divided by SIZE_DIVIDER(${SIZE_DIVIDER}) to calculate: $sizeComplexity for complexity"
+            Map sizeAssess = [assessmentType:'ConfigsetSize', complexity:sizeComplexity, items:[msg]]
+            assessment.complexity += sizeComplexity
+            assessment.items << sizeAssess
+        }
+//        configsetMap.each {String name, List<ConfigSet> configsets ->
+        configsetMap.each {String name, def configsets ->
+            log.info "\t\t$name) Assess list of configsets: $configsets (${configsets.getClass().simpleName})"
+            int i = 0
+            configsets.each { ConfigSet cfg ->
+                i++
+                log.info "\t\t$i) configset: $cfg"
+                Map csAssessment = cfg.assessComplexity()
+                int cmplx = csAssessment.complexity
+                if(cmplx) {
+                    assessment.complexity += cmplx
+                }
+                assessment.items << csAssessment
+            }
+        }
+        return assessment
+    }
+
+    @Override
+    Map<String, Object> assessItem(Object item) {
+        Map assessment = super.assessItem(item)
+        return assessment
+    }
+
+    @Override
+    Map<String, Object> assessItem(String itemName, Object item) {
+        Map assessment = super.assessItem(itemName, item)
+        return assessment
+    }
+
+
 
     @Override
     def export(){

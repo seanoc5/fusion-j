@@ -1,6 +1,6 @@
 package com.lucidworks.ps.model.solr
 
-import com.lucidworks.ps.clients.FusionClient
+
 import com.lucidworks.ps.model.BaseObject
 import groovy.json.JsonSlurper
 import groovy.xml.XmlParser
@@ -40,7 +40,7 @@ class ConfigSet extends BaseObject{
         log.debug "export to folder: ${exportFolder}"
         List<File> exportedFiles = []
         items.each { String name, Object value ->
-            // todo -- look at library (apache commons-text??) to sanitize filenames...?
+            // todo -- look for library (apache commons-text??) to sanitize filenames...?
             String outname = name.replaceAll(/\//, '_')
             if(outname.startsWith('_')){
                 log.debug "remove leading '.' in outfile name (typically zk path with leading '/' slash..."
@@ -56,11 +56,11 @@ class ConfigSet extends BaseObject{
         return exportedFiles
     }
 
-    @Override
-    def export(FusionClient fusionClient) {
-        log.warn "more code here: export object to destination fusion client: $fusionClient"
-        return null
-    }
+//    @Override
+//    def export(FusionClient fusionClient) {
+//        log.warn "more code here: export object to destination fusion client: $fusionClient"
+//        return null
+//    }
 
 
     protected Integer populateParsedItems() {
@@ -203,4 +203,23 @@ class ConfigSet extends BaseObject{
         String s = "Configset ($configsetName): Schema:(${managedSchema.toString()}) SolrConfig:(${solrConfig.toString()}) ... "
     }
 
+
+    // todo -- add logic to check for complexity... assuming migrating solr configs is fairly basic...
+    @Override
+    Map<String, Object> assessComplexity() {
+        Map assessment = super.assessComplexity()
+        return assessment
+    }
+
+    @Override
+    Map<String, Object> assessItem(Object item) {
+        Map assessment = super.assessItem(item)
+        return assessment
+    }
+
+    @Override
+    Map<String, Object> assessItem(String itemName, Object item) {
+        Map assessment = super.assessItem(itemName, item)
+        return assessment
+    }
 }

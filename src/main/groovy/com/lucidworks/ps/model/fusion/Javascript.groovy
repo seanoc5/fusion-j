@@ -24,7 +24,7 @@ class Javascript extends BaseObject {
     @Override
     def export(File exportFolder) {
         log.info "export to folder: ${exportFolder.absolutePath}"
-        String fileName = getItemName() + '.js'
+        String fileName = "${label}.js"
         File jsOut = new File(exportFolder, fileName)
         jsOut.text = script
         return null
@@ -60,4 +60,8 @@ class Javascript extends BaseObject {
     String getItemName(){
         return label
     }
+
+String toString(){
+    String s = "$label with (${lines.size()}) lines and (${script.size()} characters)"
+}
 }

@@ -24,5 +24,23 @@ class AppKits extends BaseObject {
         return null
     }
 
+    @Override
+    Map<String, Object> assessComplexity() {
+        return super.assessComplexity()
+    }
 
+    @Override
+    Map<String, Object> assessItem(Object item) {
+        return super.assessItem(item)
+    }
+
+    @Override
+    Map<String, Object> assessItem(String itemName, Object item) {
+        return super.assessItem(itemName, item)
+    }
+
+    @Override
+    String getItemName(Map item) {
+        String name = "appkitApp-" + item['appkitApp'].id
+    }
 }

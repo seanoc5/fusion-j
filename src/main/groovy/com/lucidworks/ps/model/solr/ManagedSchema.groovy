@@ -204,7 +204,7 @@ class ManagedSchema extends BaseObject {
 
     def collectSchemaFields() {
         def fields
-        log.info "collectSchemaFields label: $label"
+        log.debug "collectSchemaFields label: $label"
         try {
             def previousNode
             fields = xmlSchema.'**'.findAll { Object node ->

@@ -40,22 +40,24 @@ class DataSources extends BaseObject {
         int comp = 0
         switch (dsMap.type) {
             case 'web':
+            case 'solr':
                 log.info "${dsMap.type} upgrade is simple...(?)"
-                comp = 0
+                comp = 1
                 break
 
             case 'jdbc':
-                log.info "${dsMap.type} upgrade is simple...(?)"
-                comp = 0
+            case 'confluence':
+                log.info "${dsMap.type} upgrade might have complexity, but should on the simple side..."
+                comp = 2
                 break
 
             case 'fileupload':
                 log.info "${dsMap.type} upgrade is simple...(?)"
-                comp = 0
+                comp = 1
                 break
 
             default:
-                log.info "${dsMap.type} upgrade is not yet address, assume '1'?"
+                log.info "(${dsMap.type}) datasource upgrade is not yet address, assume '1'?"
                 comp = 1
                 break
 

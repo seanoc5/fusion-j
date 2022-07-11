@@ -1,21 +1,24 @@
 package com.lucidworks.ps.model.fusion
 
 
+import com.lucidworks.ps.model.BaseObject
+import groovy.json.JsonOutput
 import org.apache.log4j.Logger
+
 /**
  * Fusion Application helper class
  * Mix of composite objects (@see ConfigSetCollection) and regular lists/maps
  * We may convert to more explicit composite objects as necessary
  */
-class IndexPipelines extends Pipelines {
+class Pipelines extends BaseObject {
     Logger log = Logger.getLogger(this.class.name);
-//    Map<String, List<PipelineStages>> pipelineStagesMap = [:]
-//    Map<String, List<Javascript>> javascriptStages = [:]
+    Map<String, List<PipelineStages>> pipelineStagesMap = [:]
+    Map<String, List<Javascript>> javascriptStages = [:]
+    String type = 'unknown'
 
-    IndexPipelines(String applicationName, List<Map<String, Object>> items) {
+    Pipelines(String applicationName, List<Map<String, Object>> items) {
         super(applicationName, items)
-        this.type = this.getClass().simpleName
-/*
+        type = this.getClass().simpleName
         items.each { Map pipelineJsonMap ->
             String pipelineID = pipelineJsonMap.id
             if (pipelineJsonMap.stages) {
@@ -46,19 +49,17 @@ class IndexPipelines extends Pipelines {
                 log.warn "No stages in pipeline ($pipelineID): $pipelineJsonMap"
             }
         }
-*/
         log.debug "Javascript stages: $javascriptStages"
     }
 
-/*
     @Override
     def export(File exportFolder) {
-        log.info "export indexPipelines (count:${this.srcJsonList.size()}) to folder: ${exportFolder.absolutePath}"
+        log.info "export Pipelines (count:${this.srcJsonList.size()}) to folder: ${exportFolder.absolutePath}"
         List<File> exportedFiles = []
         srcJsonList.each { Map pipeline ->
             String id = pipeline.id
             // todo -- look at library (apache commons-text??) to sanitize filenames...?
-            String outname = "indexPipeline.${appName}.${id}"
+            String outname = "Pipeline.${appName}.${id}"
             File outfile = new File(exportFolder, outname + ".json")
             // todo -- handle non-text output...
             String jsonText = jsonDefaultOutput.toJson(pipeline)
@@ -82,13 +83,12 @@ class IndexPipelines extends Pipelines {
 
         return null
     }
-*/
 
-//    @Override
-//    Map<String, Object> assessItem(def item) {
-//        Map itemAssessment = super.assessItem(item)
-//
-//    }
+    @Override
+    Map<String, Object> assessItem(def item) {
+        Map itemAssessment = super.assessItem(item)
+
+    }
 
 
 }

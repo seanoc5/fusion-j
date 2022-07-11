@@ -7,30 +7,28 @@ import org.apache.log4j.Logger
  * Mix of composite objects (@see ConfigSetCollection) and regular lists/maps
  * We may convert to more explicit composite objects as necessary
  */
-class Jobs extends BaseObject {
+class PipelineStages extends BaseObject {
     Logger log = Logger.getLogger(this.class.name);
 
-    Jobs(String appName, List<Map<String, Object>> srcJsonList) {
-        super(appName, srcJsonList)
+    PipelineStages(String pipelineName, List<Map<String, Object>> srcJsonList) {
+        super(pipelineName, srcJsonList)
+        log.debug "more code here...?"
     }
 
-    Jobs(String appName, Map<String, Object> srcJsonMap) {
-        super(appName, srcJsonMap)
+    PipelineStages(String pipelineName, Map<String, Object> srcJsonMap) {
+        super(pipelineName, srcJsonMap)
+        log.debug "more code here...?"
     }
 
 
     @Override
     Map<String, Object> assessItem(def item) {
+        log.warn "\t\tmore code here: any gotchas in spark code???"
         Map itemAssessment = super.assessItem(item)
     }
 
     @Override
     int size() {
         return 1
-    }
-
-    @Override
-    String getItemName(Map item) {
-        String s = "job-${item.resource}"
     }
 }

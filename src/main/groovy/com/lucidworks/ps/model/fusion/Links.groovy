@@ -28,4 +28,9 @@ class Links extends BaseObject {
     int size() {
         return 1
     }
+
+    @Override
+    String getItemName(Map item) {
+        String s = "link-${item.subject}.${item.linkType}.${item.object}"
+    }
 }
