@@ -14,11 +14,13 @@ class Javascript extends BaseObject {
     String label
     String script
     List<String> lines = []
+    Map<String, List<String>> groupedLines = [:]
 
     Javascript(String label, String script) {
         this.label = label
         this.script = script
         lines = script.split('\n')
+        srcItems = lines
     }
 
     @Override
@@ -31,37 +33,48 @@ class Javascript extends BaseObject {
     }
 
     def groupLines() {
-        def grouped = lines.groupBy { String line ->
-            line = line.trim()
-//            if(line.contains('//')
+        groupedLines = lines.groupBy { String line ->
+            if (line.contains('//')) {
+                List<String> parts = line.split(/\/\//)
+                log.debug "Stripping comment from line:[$line] -> [${parts[0]}]"
+                line = parts[0]
+            }
 
             String type = 'n.a.'
+            line = line.trim()
 
-            if (line ==~ /\s*(var|let) */) {
-                type = 'assignment'
-            } else if (line ==~ /\s*(var|let) */) {
-                switch (line.trim()) {
-                    case ~/(var|let).*=.*/:
-                        type = 'assignment'
-                        break
-                }
+            switch (line) {
+                case ~/(var|let).*=.*/:
+                    type = 'assignment'
+                    break
+                case ~/(console|log).*/:
+                    type = 'logging'
+                    break
+                default:
+                    type = 'unknown'
             }
+            log.debug "Line type: $type :: $line"
+        }
+        log.info "\t\tGrouped lines: " + groupedLines.collect {
+            it.key + ":" + it.value.size()
         }
     }
 
 
-    @Override
-    def export(FusionClient fusionClient) {
-        throw new RuntimeException("Export to live fusion client not implemented yet...")
-        return null
-    }
+
+@Override
+def export(FusionClient fusionClient) {
+    throw new RuntimeException("Export to live fusion client not implemented yet...")
+    return null
+}
 
 
-    String getItemName(){
-        return label
-    }
+String getItemName() {
+    return label
+}
 
-String toString(){
+String toString() {
     String s = "$label with (${lines.size()}) lines and (${script.size()} characters)"
 }
+
 }
