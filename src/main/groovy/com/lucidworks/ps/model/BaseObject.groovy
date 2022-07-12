@@ -15,6 +15,7 @@ public class BaseObject {
 
     List<Map> srcJsonList = []
     Map srcJsonMap = [:]
+    def srcItems
     String itemType = this.getClass().simpleName
 
     String appName = 'n.a. base'
@@ -33,6 +34,7 @@ public class BaseObject {
      */
     BaseObject(List<Map> srcJsonList) {
         log.debug "BaseObject(List jsonItems)..."
+        srcItems = srcJsonList
         this.srcJsonList = srcJsonList
     }
 
@@ -45,6 +47,7 @@ public class BaseObject {
         log.debug "$itemType: constructor(String appName, List jsonItems)..."
         this.srcJsonList = srcJsonList
         this.appName = appName
+        srcItems = srcJsonList
     }
 
     /**
@@ -57,11 +60,8 @@ public class BaseObject {
         log.info "$itemType: constructor(String appName, MAP jsonmap)... (uncommon to get a map rather than list...)"
         this.srcJsonMap = srcJsonMap
         this.appName = appName
+        srcItems = srcJsonMap
     }
-
-//    BaseObject(File jsonFile) {
-//        this.jsonItems = new JsonSlurper().parse(jsonFile)
-//    }
 
 
     def export() {
@@ -109,6 +109,54 @@ public class BaseObject {
     def export(FusionClient fusionClient) {
         throw new IllegalArgumentException("Not implemented yet!!")
     }
+
+/*
+    def compare(BaseObject objectToCompare){
+        def leftThings = this.srcItems
+        def rightThings = objectToCompare.srcItems
+        LeftRightCollectionResults collectionResults = new LeftRightCollectionResults(thingType, valueDiffsToIgnore)
+
+        if (leftThings && rightThings) {
+            if (leftThings?.class?.name == rightThings?.class?.name) {
+                if(leftThings instanceof BaseObject){
+                    // todo -- refactor to more elegant handling of BaseObject comparison, for now, just get the underlying JsonObjects to compare...
+                    leftThings = ((BaseObject)leftThings).srcItems
+                    rightThings = ((BaseObject)rightThings).srcItems
+                } else {
+                    log.debug "Comparing things of class type: ${leftThings.getClass().simpleName}"
+                }
+
+                if (leftThings instanceof List) {
+                    compareIds(leftThings, rightThings, collectionResults)
+                    this.collectionComparisons[thingType] = collectionResults
+
+                    collectionResults.sharedIds.each { String id ->
+                        log.debug "\t\tComparing shared object with id: $id"
+                        def leftObject = leftThings.find { it.id == id }
+                        def rightObject = rightThings.find { it.id == id }
+
+                        CompareJsonObjectResults objectsResults = compareJsonObjects(thingType, leftObject, rightObject)
+                        collectionResults.objectsResults[id] = objectsResults
+                        log.debug "Compare results: $objectsResults"
+                    }
+                } else if (leftThings instanceof BaseObject) {
+                    log.warn "Compare BaseObjects: ${leftThings.getClass().simpleName}"
+
+                } else if (leftThings instanceof Map) {
+                    log.warn "TODO:: Process map (Left:${leftThings.keySet().size()}) for thing type: $thingType"
+                } else {
+                    log.warn "No a list? Is this features?..."
+                }
+            } else {
+                String msg = "Left thing type (${leftThings.class.name}) different than right things type (${rightThings.class.name})"
+                throw new IllegalArgumentException(msg)
+            }
+        } else {
+            log.warn "${thingType}) leftthing($leftThings) and/or right things($rightThings) not valid..?"
+        }
+
+    }
+*/
 
     String toJson(boolean prettyPrint = true) {
         String json = null
