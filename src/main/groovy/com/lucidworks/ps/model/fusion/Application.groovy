@@ -354,10 +354,10 @@ class Application extends BaseObject {
                 name          : appName,
                 source        : source,
                 collections   : collections?.size(),
-                dataSources   : dataSources.size(),
-                indexPipelines: indexPipelines.size(),
-                queryPipelines: queryPipelines.size(),
-                parsers       : parsers.size(),
+                dataSources   : dataSources?.size(),
+                indexPipelines: indexPipelines?.size(),
+                queryPipelines: queryPipelines?.size(),
+                parsers       : parsers?.size(),
         ]
         infoMap
     }
