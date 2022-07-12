@@ -15,7 +15,8 @@ class ExportedAppArgParser {
         CliBuilder cli = new CliBuilder(usage: "${toolName}.groovy -s/Users/sean/data/MyApp.objects.json", width: 160)
         cli.with {
             h longOpt: 'help', 'Show usage information'
-            g longOpt: 'grouped', required: false, argName: 'grouped', 'Group exported files by fusion type'
+//            g longOpt: 'grouped', required: false, argName: 'grouped', 'Group exported files by fusion type'
+            l longOpt: 'flat', required: false, argName: 'flatOutput', 'Export files in a flat/ungrouped format, otherwise the default is to group by object type'
             s longOpt: 'source', args: 1, required: true, argName: 'sourceFile', 'Source (objects.json or appexport.zip) to read application objects from (old app to be migrated)'
             x longOpt: 'exportDir', args: 1, required: false, argName: 'dir', 'Export directory'
         }
