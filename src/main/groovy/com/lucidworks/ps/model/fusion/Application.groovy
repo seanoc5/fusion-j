@@ -298,9 +298,14 @@ class Application extends BaseObject {
 
             } else {
                 String name = zipEntry.name
-                String content = extractZipEntryText(zipFile, zipEntry)
-                unknownItems[name] = content
-                log.warn "Storing UNKNOWN zip entry: ${zipEntry} (in application.unknownItems map) -- is this a problem? anything valuable we should be processing?"
+                if(name.endsWith('/')){
+                    log.info "Skip zip file folder: $name"
+                } else {
+                    // todo -- add logic to handle non-text blobs...
+                    String content = extractZipEntryText(zipFile, zipEntry)
+                    unknownItems[name] = content
+                    log.warn "Storing UNKNOWN zip entry: ${zipEntry} (in application.unknownItems map) -- is this a problem? anything valuable we should be processing?"
+                }
             }
             log.debug "ZipEntry: $zipEntry"
         }
