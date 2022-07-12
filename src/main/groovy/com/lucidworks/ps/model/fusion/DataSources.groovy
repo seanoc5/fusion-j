@@ -41,7 +41,7 @@ class DataSources extends BaseObject {
         switch (dsMap.type) {
             case 'web':
             case 'solr':
-                log.info "${dsMap.type} upgrade is simple...(?)"
+                log.debug "${dsMap.type} upgrade is simple...(?)"
                 comp = 1
                 break
 
