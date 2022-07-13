@@ -48,9 +48,9 @@ class IndexPipelines extends Pipelines {
         log.debug "Javascript stages: $javascriptStages"
     }
 
-    def getJavascriptStages(){
-
-    }
+//    def getJavascriptStages(){
+//
+//    }
 
 /*
     @Override

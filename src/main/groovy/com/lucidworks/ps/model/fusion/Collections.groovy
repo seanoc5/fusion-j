@@ -104,6 +104,8 @@ class Collections extends BaseObject {
             complexity++
             Map item = [message: "${name}) Alias in name, added complexity: 1", complexity: 1]
             assessment.alias = item
+        } else if(name.matches('.*(signals'){
+
         } else {
             log.debug "No alias, ignore..."
             //            collComplexity.alias = [message: "Not alias, no added compexity", complexity: 0]
