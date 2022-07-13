@@ -6,13 +6,15 @@ import groovy.json.JsonOutput
 import org.apache.log4j.Logger
 
 /**
- * Fusion Application helper class
+ * Fusion Application helper class - wraps a group of pipelines (i.e. for a given fusion app)
  * Mix of composite objects (@see ConfigSetCollection) and regular lists/maps
  * We may convert to more explicit composite objects as necessary
  */
 class Pipelines extends BaseObject {
     Logger log = Logger.getLogger(this.class.name);
+    /** map of stages grouped by pipeline id/key */
     Map<String, List<PipelineStages>> pipelineStagesMap = [:]
+    /** map of javascript stages grouped by pipeline id/key -- helpful in export and assessement */
     Map<String, List<Javascript>> javascriptStages = [:]
     String type = 'unknown'
 

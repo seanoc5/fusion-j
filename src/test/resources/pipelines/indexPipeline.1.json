@@ -1,4 +1,4 @@
-{
+[{
   "id": "cpcStoreEn1",
   "stages": [
     {
@@ -208,3 +208,4 @@
     "secretSourcePipelineId": "cpcStoreEn1"
   }
 }
+]

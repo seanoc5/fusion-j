@@ -9,8 +9,6 @@ import org.apache.log4j.Logger
  */
 class IndexPipelines extends Pipelines {
     Logger log = Logger.getLogger(this.class.name);
-//    Map<String, List<PipelineStages>> pipelineStagesMap = [:]
-//    Map<String, List<Javascript>> javascriptStages = [:]
 
     IndexPipelines(String applicationName, List<Map<String, Object>> items) {
         super(applicationName, items)
@@ -48,6 +46,10 @@ class IndexPipelines extends Pipelines {
         }
 */
         log.debug "Javascript stages: $javascriptStages"
+    }
+
+    def getJavascriptStages(){
+
     }
 
 /*

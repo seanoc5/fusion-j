@@ -29,11 +29,11 @@ class Javascript extends BaseObject {
         String fileName = "${label}.js"
         File jsOut = new File(exportFolder, fileName)
         jsOut.text = script
-        return null
+        return jsOut
     }
 
     def groupLines() {
-        groupedLines = lines.groupBy { String line ->
+        def grouped = lines.groupBy { String line ->
             if (line.contains('//')) {
                 List<String> parts = line.split(/\/\//)
                 log.debug "Stripping comment from line:[$line] -> [${parts[0]}]"
@@ -58,6 +58,7 @@ class Javascript extends BaseObject {
         log.info "\t\tGrouped lines: " + groupedLines.collect {
             it.key + ":" + it.value.size()
         }
+        return grouped
     }
 
 
