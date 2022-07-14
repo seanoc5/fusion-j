@@ -21,3 +21,18 @@ This is meant to help access to Fusion 'things'. Initially this is focused on in
 - 
 - query: (app, collection, query params[q:'...', ], handler='select')
 - index: (app, collection, index params[docs:[], ], handler='select')
+
+
+## Diff friendly exports
+### idex pipeline
+notes:
+* leave id? name of pipeline, probably keep
+* id == secretSourceid?? assume so for now (revisit?) 
+  * remove secret id 
+* id naming tool/process? human readable stages etc, 
+  * does fusion step in IDs? can we humanize ids and keep them around?
+  * Users? set id to something like: realm-userid-...? make it guessable?
+* Datasources
+  * verify access??
+  * solr_base_url?
+  * 
