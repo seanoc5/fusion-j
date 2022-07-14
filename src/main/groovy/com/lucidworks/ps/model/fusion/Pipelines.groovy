@@ -16,11 +16,11 @@ class Pipelines extends BaseObject {
     Map<String, List<PipelineStages>> pipelineStagesMap = [:]
     /** map of javascript stages grouped by pipeline id/key -- helpful in export and assessement */
     Map<String, List<Javascript>> javascriptStages = [:]
-    String type = 'unknown'
+//    String type = 'unknown'
 
     Pipelines(String applicationName, List<Map<String, Object>> items) {
         super(applicationName, items)
-        type = this.getClass().simpleName
+//        itemType = this.getClass().simpleName
         items.each { Map pipelineJsonMap ->
             String pipelineID = pipelineJsonMap.id
             if (pipelineJsonMap.stages) {

@@ -64,19 +64,20 @@ public class BaseObject {
     }
 
 
-    def export() {
-        log.info "Just a 'preview' -- not functional, consider calling export with exportDir param..."
-        if (srcJsonList) {
-            srcJsonList.each {
-                log.info "$it"
-            }
-        } else if (srcJsonMap) {
-            srcJsonMap.each { def key, def val ->
-                log.info "Key ($key) --> val ($val)"
-            }
+    String export(Map rules = [set:[], remove:[/created|lastUpdated/]]) {
+        String s = null
+        if(srcItems){
+            log.info "export srcItems to String (override for non-strings and anything else that did not come from a JsonSluper..."
+            String json = jsonDefaultOutput.toJson(srcItems)
+            String pretty = JsonOutput.prettyPrint(json)
+            s = pretty
         } else {
-            log.warn "Unknown thing type to export: $this (no srcJsonMap or srcJsonList...??)"
+            String msg = "Unknown item time (no srcItems) to export for itemType: $itemType"
+            log.error msg
+            throw new IllegalArgumentException(msg)
         }
+        return s
+
     }
 
     def export(File exportFolder) {

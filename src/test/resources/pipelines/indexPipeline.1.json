@@ -1,211 +1,128 @@
-[{
-  "id": "cpcStoreEn1",
-  "stages": [
-    {
-      "type": "javascript-index",
-      "id": "f23",
-      "script": "function( doc ) { \n\n \n\n                doc.setField( 'debug2_s', 'test-20210809');\n\n\n                return doc;\n}",
-      "type": "javascript-index",
-      "skip": true,
-      "label": "Test",
-      "secretSourceStageId": "f23"
+[
+  {
+    "id": "testIdxPipeline",
+    "stages": [
+      {
+        "type": "javascript-index",
+        "id": "tip1",
+        "script": "function( doc ) { \n\n \n\n                doc.setField( 'debug2_s', 'test-20210809');\n\n\n                return doc;\n}",
+        "type": "javascript-index",
+        "skip": true,
+        "label": "Test",
+        "secretSourceStageId": "tip1"
+      },
+      {
+        "type": "javascript-index",
+        "id": "tip2",
+        "script": "function( doc ) { \n\n  \nvar inputText = doc.getFirstFieldValue('content_productName');\n   if(inputText){\n                var returnText = \"\" + inputText;\n                returnText=returnText.replace(/<sup>TM<\\/sup>/gi, \"™\");\n                doc.setField( 'content_productName', returnText);\n                }\n   if(inputText){\n                var returnText = \"\" + inputText;\n                returnText=returnText.replace(/XpresspostTM/gi, \"XpressPost™\");\n                doc.setField( 'content_productName', returnText);\n                }  \n\nvar inputText = doc.getFirstFieldValue('content_productFullDescription');\n   if(inputText){\n                var returnText = \"\" + inputText;\n                returnText=returnText.replace(/<sup>TM<\\/sup>/gi, \"™\");\n                doc.setField( 'content_productFullDescription', returnText);\n                }\n\n\n                return doc;\n}",
+        "type": "javascript-index",
+        "skip": false,
+        "label": "Replace Special Chars (JS)",
+        "secretSourceStageId": "tip2"
+      },
+      {
+        "type": "field-mapping",
+        "id": "tip3",
+        "mappings": [
+          {
+            "source": "updateDate",
+            "target": "dateupdated_dt",
+            "operation": "move"
+          },
+          {
+            "source": "modifiedTimestamp",
+            "target": "datesync_dt",
+            "operation": "move"
+          },
+          {
+            "source": "createDate",
+            "target": "datecreated_dt",
+            "operation": "move"
+          }
+        ],
+        "reservedFieldsMappingAllowed": false,
+        "type": "field-mapping",
+        "skip": false,
+        "secretSourceStageId": "tip3"
+      },
+      {
+        "type": "solr-dynamic-field-name-mapping",
+        "id": "tip4",
+        "duplicateSingleValuedFields": false,
+        "fieldsToExclude": [],
+        "advancedTextFieldsIndexing": true,
+        "maxTextLengthForAdvancedIndexing": 100,
+        "type": "solr-dynamic-field-name-mapping",
+        "skip": false,
+        "secretSourceStageId": "tip4"
+      },
+      {
+        "type": "regex-extractor",
+        "id": "tip5",
+        "rules": [
+          {
+            "source": [
+              "collection_ss"
+            ],
+            "target": "collection_ss",
+            "writeMode": "overwrite",
+            "pattern": "[^,\\\\s][^\\\\,]*[^,\\\\s]*",
+            "returnIfNoMatch": "input_string",
+            "group": 0
+          },
+          {
+            "source": [
+              "serviceRegion_ss"
+            ],
+            "target": "serviceRegion_ss",
+            "writeMode": "overwrite",
+            "pattern": "[^,\\\\s][^\\\\,]*[^,\\\\s]*",
+            "returnIfNoMatch": "input_string",
+            "group": 0
+          },
+          {
+            "source": [
+              "artist_ss"
+            ],
+            "target": "artist_ss",
+            "writeMode": "overwrite",
+            "pattern": "[^,\\\\s][^\\\\,]*[^,\\\\s]*",
+            "returnIfNoMatch": "input_string",
+            "group": 0
+          }
+        ],
+        "type": "regex-extractor",
+        "skip": false,
+        "secretSourceStageId": "tip5"
+      },
+      {
+        "type": "solr-index",
+        "id": "tip6",
+        "enforceSchema": true,
+        "dateFormats": [],
+        "params": [],
+        "bufferDocsForSolr": false,
+        "type": "solr-index",
+        "skip": false,
+        "secretSourceStageId": "tip6"
+      }
+    ],
+    "properties": {
+      "secretSourcePipelineId": "testIdxPipeline"
     },
-    {
-      "type": "javascript-index",
-      "id": "usm",
-      "script": "function( doc ) { \n\n  \nvar inputText = doc.getFirstFieldValue('content_productName');\n   if(inputText){\n                var returnText = \"\" + inputText;\n                returnText=returnText.replace(/<sup>TM<\\/sup>/gi, \"™\");\n                doc.setField( 'content_productName', returnText);\n                }\n   if(inputText){\n                var returnText = \"\" + inputText;\n                returnText=returnText.replace(/XpresspostTM/gi, \"XpressPost™\");\n                doc.setField( 'content_productName', returnText);\n                }  \n\nvar inputText = doc.getFirstFieldValue('content_productFullDescription');\n   if(inputText){\n                var returnText = \"\" + inputText;\n                returnText=returnText.replace(/<sup>TM<\\/sup>/gi, \"™\");\n                doc.setField( 'content_productFullDescription', returnText);\n                }\n\n\n                return doc;\n}",
-      "type": "javascript-index",
-      "skip": false,
-      "label": "Replace Special Chars (JS)",
-      "secretSourceStageId": "usm"
-    },
-    {
-      "type": "javascript-index",
-      "id": "znd",
-      "script": "function( doc ) { \n\n \nvar inputText = doc.getFirstFieldValue('content_productName');\n   if(inputText){\n                var returnText = \"\" + inputText;\n                returnText=returnText.replace(/<br>/gi, \"\\n\");\n                returnText=returnText.replace(/<br\\s\\/>/gi, \"\\n\");\n                returnText=returnText.replace(/<br\\/>/gi, \"\\n\");\n                returnText=returnText.replace(/<p.*>/gi, \"\\n\");\n                returnText=returnText.replace(/<a.*href=\"(.*?)\".*>(.*?)<\\/a>/gi, \" $2 ($1)\");\n                returnText=returnText.replace(/<script.*>[\\w\\W]{1,}(.*?)[\\w\\W]{1,}<\\/script>/gi, \"\");\n                returnText=returnText.replace(/<style.*>[\\w\\W]{1,}(.*?)[\\w\\W]{1,}<\\/style>/gi, \"\");\n                returnText=returnText.replace(/<(?:.|\\s)*?>/g, \"\");\n                returnText=returnText.replace(/(?:(?:\\r\\n|\\r|\\n)\\s*){2,}/gim,\"\\n\\n\");\n                returnText = returnText.replace(/ +(?= )/g,'');\n                returnText=returnText.replace(/&nbsp;/gi,\" \");\n                returnText=returnText.replace(/&amp;/gi,\"&\");\n                returnText=returnText.replace(/&quot;/gi,'\"');\n                returnText=returnText.replace(/&lt;/gi,'<');\n                returnText=returnText.replace(/&gt;/gi,'>');\n                returnText=returnText.replace(/\\\\n\\\\n/g,\"\\n\\n\");\n                doc.setField( 'content_productName', returnText);\n                }\n\nvar inputText = doc.getFirstFieldValue('content_productFullDescription');\n   if(inputText){\n                var returnText = \"\" + inputText;\n                returnText=returnText.replace(/<br>/gi, \"\\n\");\n                returnText=returnText.replace(/<br\\s\\/>/gi, \"\\n\");\n                returnText=returnText.replace(/<br\\/>/gi, \"\\n\");\n                returnText=returnText.replace(/<p.*>/gi, \"\\n\");\n                returnText=returnText.replace(/<a.*href=\"(.*?)\".*>(.*?)<\\/a>/gi, \" $2 ($1)\");\n                returnText=returnText.replace(/<script.*>[\\w\\W]{1,}(.*?)[\\w\\W]{1,}<\\/script>/gi, \"\");\n                returnText=returnText.replace(/<style.*>[\\w\\W]{1,}(.*?)[\\w\\W]{1,}<\\/style>/gi, \"\");\n                returnText=returnText.replace(/<(?:.|\\s)*?>/g, \"\");\n                returnText=returnText.replace(/(?:(?:\\r\\n|\\r|\\n)\\s*){2,}/gim,\"\\n\\n\");\n                returnText = returnText.replace(/ +(?= )/g,'');\n                returnText=returnText.replace(/&nbsp;/gi,\" \");\n                returnText=returnText.replace(/&amp;/gi,\"&\");\n                returnText=returnText.replace(/&quot;/gi,'\"');\n                returnText=returnText.replace(/&lt;/gi,'<');\n                returnText=returnText.replace(/&gt;/gi,'>');\n                returnText=returnText.replace(/\\\\n\\\\n/g,\"\\n\\n\");\n                doc.setField( 'content_productFullDescription', returnText);\n                }\n\n\n                return doc;\n}",
-      "type": "javascript-index",
-      "skip": false,
-      "label": "Strip HTML (JS)",
-      "secretSourceStageId": "znd"
-    },
-    {
-      "type": "field-mapping",
-      "id": "1e95800d-7adb-4c05-b8a4-73afb82c2d19",
-      "mappings": [
-        {
-          "source": "updateDate",
-          "target": "dateupdated_dt",
-          "operation": "move"
-        },
-        {
-          "source": "modifiedTimestamp",
-          "target": "datesync_dt",
-          "operation": "move"
-        },
-        {
-          "source": "properties_tenant_theme_values",
-          "target": "theme_s",
-          "operation": "move"
-        },
-        {
-          "source": "properties_tenant_service_region_values",
-          "target": "serviceRegion_ss",
-          "operation": "move"
-        },
-        {
-          "source": "properties_tenant_rcm_item_number_values",
-          "target": "rcmNumber_s",
-          "operation": "move"
-        },
-        {
-          "source": "properties_tenant_promotional_ribbon_values",
-          "target": "promotionRibbon_s",
-          "operation": "move"
-        },
-        {
-          "source": "productCode",
-          "target": "productCode_l",
-          "operation": "move"
-        },
-        {
-          "source": "price_salePrice",
-          "target": "priceSale_d",
-          "operation": "move"
-        },
-        {
-          "source": "price_price",
-          "target": "price_d",
-          "operation": "move"
-        },
-        {
-          "source": "properties_tenant_face_value_values",
-          "target": "faceValue_l",
-          "operation": "move"
-        },
-        {
-          "source": "createDate",
-          "target": "datecreated_dt",
-          "operation": "move"
-        },
-        {
-          "source": "content_seoFriendlyUrl",
-          "target": "seoFriendlyUrl_s",
-          "operation": "move"
-        },
-        {
-          "source": "content_productImages_imageUrl",
-          "target": "thumbnail_s",
-          "operation": "move"
-        },
-        {
-          "source": "content_localeCode",
-          "target": "locale_s",
-          "operation": "copy"
-        },
-        {
-          "source": "properties_tenant_product_collection_values",
-          "target": "collection_ss",
-          "operation": "move"
-        },
-        {
-          "source": "properties_tenant_artist_values",
-          "target": "artist_ss",
-          "operation": "move"
-        },
-        {
-          "source": "content_localeCode",
-          "target": "language",
-          "operation": "move"
-        },
-        {
-          "source": "content_productName",
-          "target": "title_t",
-          "operation": "move"
-        },
-        {
-          "source": "content_productFullDescription",
-          "target": "description_t",
-          "operation": "move"
-        }
-      ],
-      "reservedFieldsMappingAllowed": false,
-      "type": "field-mapping",
-      "skip": false,
-      "secretSourceStageId": "1e95800d-7adb-4c05-b8a4-73afb82c2d19"
-    },
-    {
-      "type": "solr-dynamic-field-name-mapping",
-      "id": "ef572608-4623-4594-8065-7a7e93fb026b",
-      "duplicateSingleValuedFields": false,
-      "fieldsToExclude": [],
-      "advancedTextFieldsIndexing": true,
-      "maxTextLengthForAdvancedIndexing": 100,
-      "type": "solr-dynamic-field-name-mapping",
-      "skip": false,
-      "secretSourceStageId": "ef572608-4623-4594-8065-7a7e93fb026b"
-    },
-    {
-      "type": "regex-extractor",
-      "id": "xm4",
-      "rules": [
-        {
-          "source": [
-            "collection_ss"
-          ],
-          "target": "collection_ss",
-          "writeMode": "overwrite",
-          "pattern": "[^,\\\\s][^\\\\,]*[^,\\\\s]*",
-          "returnIfNoMatch": "input_string",
-          "group": 0
-        },
-        {
-          "source": [
-            "serviceRegion_ss"
-          ],
-          "target": "serviceRegion_ss",
-          "writeMode": "overwrite",
-          "pattern": "[^,\\\\s][^\\\\,]*[^,\\\\s]*",
-          "returnIfNoMatch": "input_string",
-          "group": 0
-        },
-        {
-          "source": [
-            "artist_ss"
-          ],
-          "target": "artist_ss",
-          "writeMode": "overwrite",
-          "pattern": "[^,\\\\s][^\\\\,]*[^,\\\\s]*",
-          "returnIfNoMatch": "input_string",
-          "group": 0
-        }
-      ],
-      "type": "regex-extractor",
-      "skip": false,
-      "secretSourceStageId": "xm4"
-    },
-    {
-      "type": "javascript-index",
-      "id": "xh",
-      "script": "function(doc) {\n\t//if (doc !== null) {\n      //if (doc !== null && doc.getId() !== null) {\n\n      if (doc.hasField(\"url\"))   {\n\t\t\tvar estoreurl = doc.getFirstFieldValue(\"url\");\n            doc.addField(\"url_original\", estoreurl);\n        \n        \t//Truncate Kibo domain\n        \tvar baseurl = estoreurl.replace(/^.*\\/\\/[^\\/]+/, '');\n        \t\n        \t//add root-context English\n        \tbaseurl = \"https://store.canadapost-postescanada.ca/store-boutique/en\" + baseurl;\n        \t\n        \tdoc.setField(\"url\", baseurl);\n            doc.setField(\"estoreboost\", baseurl);\n            //test\n  \t\t\t//doc.addField(\"aa_inscript2\", \"in Domain Truncate, baseurl: \" + baseurl);\n        \t//doc.addField(\"aa_inscript3\", \"in Domain Truncate, original: \" + estoreurl);\n  \t\t\t//end test\n\t\t}\n\t//}\n\treturn doc;\n}",
-      "type": "javascript-index",
-      "skip": false,
-      "label": "eStore Domain Truncate Add Root Context English",
-      "secretSourceStageId": "xh"
-    },
-    {
-      "type": "solr-index",
-      "id": "58de77f1-6782-4ade-9155-a7e35eb3fa0c",
-      "enforceSchema": true,
-      "dateFormats": [],
-      "params": [],
-      "bufferDocsForSolr": false,
-      "type": "solr-index",
-      "skip": false,
-      "secretSourceStageId": "58de77f1-6782-4ade-9155-a7e35eb3fa0c"
-    }
-  ],
-  "properties": {
-    "secretSourcePipelineId": "cpcStoreEn1"
+    "updates": [
+      {
+        "userId": "admin",
+        "timestamp": "2021-04-14T06:28:02.447Z"
+      },
+      {
+        "userId": "ashumway",
+        "timestamp": "2021-12-16T19:22:31.713Z"
+      },
+      {
+        "userId": "ashumway",
+        "timestamp": "2022-03-17T18:45:56.613Z"
+      }
+    ]
   }
-}
 ]

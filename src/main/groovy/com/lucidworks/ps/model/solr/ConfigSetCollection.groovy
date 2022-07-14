@@ -71,7 +71,7 @@ class ConfigSetCollection extends BaseObject{
 
 
     @Override
-    def export(){
+    String export(){
         configsetMap.each { String name, ConfigSet configSet ->
             log.info "export configset ($name): ${configSet}"
         }
