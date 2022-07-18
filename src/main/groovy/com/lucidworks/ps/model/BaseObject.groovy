@@ -10,7 +10,7 @@ import org.apache.log4j.Logger
  * Base object to facilitate exporting to various destinations (filesystem, fusion instance,...)
  */
 public class BaseObject {
-    final Logger log = Logger.getLogger(this.class.name);
+    static final Logger log = Logger.getLogger(this.class.name);
     static def jsonDefaultOutput = new JsonGenerator.Options().dateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").build()
 
     List<Map> srcJsonList = []

@@ -16,7 +16,7 @@ import java.util.zip.ZipFile
  * We may convert to more explicit composite objects as necessary
  */
 class Application extends BaseObject {
-    Logger log = Logger.getLogger(this.class.name);
+    static final Logger log = Logger.getLogger(this.class.name);
     public static final List<String> DEFAULT_APP_OBJECTS = "configsets collections dataSources indexPipelines indexProfiles queryPipelines queryProfiles parsers blobs appkitApps features objectGroups links sparkJobs jobs".split(' ')
 
     /** Object holding source for loading this app (file, fusion-j client, git repo... */
@@ -141,6 +141,21 @@ class Application extends BaseObject {
         }
 
         log.info "loaded application: $this"
+    }
+
+    /**
+     * get objects.json info from exported app (F4+)
+     * @param sourceZip
+     */
+    static Map<String, Object> getObjectsJson(File sourceZip) {
+        ZipFile zipFile = new ZipFile(sourceZip)
+        Enumeration<? extends ZipEntry> entries = zipFile.entries()
+        ZipEntry objectsJsonZipEntry = entries.find { it.name.equalsIgnoreCase('objects.json') }
+        String objectsJson = extractZipEntryText(zipFile, objectsJsonZipEntry)
+        JsonSlurper jsonSlurper = new JsonSlurper()
+        Map<String,Object> objectsMap  = jsonSlurper.parseText(objectsJson)
+        log.info "Got Map from objects json in zip: $sourceZip"
+        return objectsMap
     }
 
     def export(File destinationFile, Pattern thingsToExport) {
@@ -298,7 +313,7 @@ class Application extends BaseObject {
 
             } else {
                 String name = zipEntry.name
-                if(name.endsWith('/')){
+                if (name.endsWith('/')) {
                     log.info "Skip zip file folder: $name"
                 } else {
                     // todo -- add logic to handle non-text blobs...
@@ -335,7 +350,7 @@ class Application extends BaseObject {
      * @param zipEntry
      * @return
      */
-    public String extractZipEntryText(ZipFile zipFile, ZipEntry zipEntry) {
+    static  public String extractZipEntryText(ZipFile zipFile, ZipEntry zipEntry) {
         String jsonString
         InputStream inputStream = zipFile.getInputStream(zipEntry)
         BufferedReader br = new BufferedReader(new InputStreamReader(inputStream, "UTF-8"));
