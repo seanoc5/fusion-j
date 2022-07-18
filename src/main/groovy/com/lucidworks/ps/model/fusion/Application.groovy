@@ -148,7 +148,7 @@ class Application extends BaseObject {
      * shortcut if we don't want to load the entire zip file (configsets, rules,...
      * @param sourceZip
      */
-    static Map<String, Object> getObjectsJson(File sourceZip) {
+    static Map<String, Object> getObjectsJsonMap(File sourceZip) {
         ZipFile zipFile = new ZipFile(sourceZip)
         Enumeration<? extends ZipEntry> entries = zipFile.entries()
         ZipEntry objectsJsonZipEntry = entries.find { it.name.equalsIgnoreCase('objects.json') }
