@@ -145,6 +145,7 @@ class Application extends BaseObject {
 
     /**
      * get objects.json info from exported app (F4+)
+     * shortcut if we don't want to load the entire zip file (configsets, rules,...
      * @param sourceZip
      */
     static Map<String, Object> getObjectsJson(File sourceZip) {
