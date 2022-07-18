@@ -8,17 +8,16 @@ import org.apache.log4j.Logger
 /**
  * Helper class to standardize argument syntax for FusionClient programs and driver-scripts
  */
-class ExportedAppArgParser {
+class DeploymentArgParser {
     static Logger log = Logger.getLogger(this.class.name);
 
     public static OptionAccessor parse(String toolName, String[] args) {
-        CliBuilder cli = new CliBuilder(usage: "${toolName}.groovy -s/Users/sean/data/MyApp.objects.json", width: 160)
+        CliBuilder cli = new CliBuilder(usage: "${toolName}.groovy -s/Users/sean/data/MyExportedApp.zip", width: 160)
         cli.with {
             h longOpt: 'help', 'Show usage information'
-            c longOpt: "config", argName: 'configFile', 'Configuration file to load with GRoovy ConfigSlurper: http://docs.groovy-lang.org/next/html/gapi/groovy/util/ConfigSlurper.html'
-            l longOpt: 'flat', required: false, argName: 'flatOutput', 'Export files in a flat/ungrouped format, otherwise the default is to group by object type'
+            c longOpt: "config", args:1, required: true,  argName: 'configFile', 'Configuration file to load with GRoovy ConfigSlurper: http://docs.groovy-lang.org/next/html/gapi/groovy/util/ConfigSlurper.html'
             s longOpt: 'source', args: 1, required: true, argName: 'sourceFile', 'Source (objects.json or appexport.zip) to read application objects from (old app to be migrated)'
-            x longOpt: 'exportDir', args: 1, required: false, argName: 'dir', 'Export directory'
+            x longOpt: 'exportDir', args: 1, required: true, argName: 'dir', 'Export directory'
         }
 
 
