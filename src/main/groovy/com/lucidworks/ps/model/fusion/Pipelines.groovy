@@ -11,7 +11,7 @@ import org.apache.log4j.Logger
  * We may convert to more explicit composite objects as necessary
  */
 class Pipelines extends BaseObject {
-    Logger log = Logger.getLogger(this.class.name);
+    static Logger log = Logger.getLogger(this.class.name);
     /** map of stages grouped by pipeline id/key */
     Map<String, List<PipelineStages>> pipelineStagesMap = [:]
     /** map of javascript stages grouped by pipeline id/key -- helpful in export and assessement */
