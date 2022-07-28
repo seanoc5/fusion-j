@@ -3,6 +3,10 @@ package com.lucidworks.ps.model.fusion
 
 import com.lucidworks.ps.model.BaseObject
 import org.apache.log4j.Logger
+
+import java.nio.file.Files
+import java.nio.file.Path
+
 /**
  * placeholder component app for Datasources (when/if necessary)
  * todo -- remove me, or make me useful, I am space at the moment....
@@ -12,6 +16,21 @@ class Blobs extends BaseObject {
 
     Blobs(String applicationName, List<Map<String, Object>> items) {
         super(applicationName, items)
+    }
+
+    Blobs(String appName, Path blobsFolder){
+        log.info "app($appName), path($blobsFolder) construnctor...."
+        this.appName = appName
+        srcItems = [:]
+        blobsFolder.eachFileRecurse {Path itemPath ->
+            String relativePath = blobsFolder.relativize(itemPath)
+            if(Files.isDirectory(itemPath)){
+                log.info "\t\tprocessing folder: $itemPath..."
+            } else {
+                log.info "\t\t\t\tPath item: $itemPath -- relativePath:$relativePath"
+            }
+            srcItems.put(relativePath, itemPath)
+        }
     }
 
     @Override
@@ -39,7 +58,7 @@ class Blobs extends BaseObject {
         return assessItem
     }
 
-    def loadBlobs(){
+  /*  def loadBlobs(){
         throw new IllegalArgumentException("Incomplete code -- add logic for loading blobs from... somewhere...?")
-    }
+    }*/
 }

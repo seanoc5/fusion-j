@@ -16,6 +16,7 @@ class DeploymentArgParser {
         cli.with {
             h longOpt: 'help', 'Show usage information'
             c longOpt: "config", args:1, required: true,  argName: 'configFile', 'Configuration file to load with GRoovy ConfigSlurper: http://docs.groovy-lang.org/next/html/gapi/groovy/util/ConfigSlurper.html'
+            r longOpt: "replace", 'boolean option for replace destination if a file exists (folders with existing files are a special case)'
             s longOpt: 'source', args: 1, required: true, argName: 'sourceFile', 'Source (objects.json or appexport.zip) to read application objects from (old app to be migrated)'
             x longOpt: 'exportDir', args: 1, required: true, argName: 'dir', 'Export directory'
         }
