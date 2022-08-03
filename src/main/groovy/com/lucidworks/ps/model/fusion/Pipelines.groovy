@@ -1,6 +1,6 @@
 package com.lucidworks.ps.model.fusion
 
-
+import com.lucidworks.ps.Helper
 import com.lucidworks.ps.model.BaseObject
 import groovy.json.JsonOutput
 import org.apache.log4j.Logger
@@ -29,10 +29,10 @@ class Pipelines extends BaseObject {
                 pipelineJsonMap.stages.each {
                     String stageId = it.id
                     String type = it.type
-                    if(type.containsIgnoreCase('javascript')){
+                    if (type.containsIgnoreCase('javascript')) {
                         String label = "$applicationName :: $pipelineID :: $stageId :: $type"
                         String script = it.script?.trim()
-                        if(script) {
+                        if (script) {
                             Javascript js = new Javascript(label, script)
                             jsStages << js
                         } else {
@@ -41,14 +41,14 @@ class Pipelines extends BaseObject {
                     }
                 }
 
-                if(jsStages) {
+                if (jsStages) {
                     javascriptStages[pipelineID] = jsStages
                 } else {
                     log.debug "no js stages in $pipelineID"
                 }
                 log.debug "jsStages: ${jsStages.size()}"
             } else {
-                log.warn "No stages in pipeline ($pipelineID): $pipelineJsonMap"
+                log.warn "!!!!!!!!!!!! No stages in pipeline ($pipelineID): $pipelineJsonMap"
             }
         }
         log.debug "Javascript stages: $javascriptStages"
@@ -61,14 +61,14 @@ class Pipelines extends BaseObject {
         srcJsonList.each { Map pipeline ->
             String id = pipeline.id
             // todo -- look at library (apache commons-text??) to sanitize filenames...?
-            String outname = "Pipeline.${appName}.${id}"
+            String outname = id           //  "${appName}.${id}" // appname overkill???
             File outfile = new File(exportFolder, outname + ".json")
             // todo -- handle non-text output...
             String jsonText = jsonDefaultOutput.toJson(pipeline)
             String prettyJson = JsonOutput.prettyPrint(jsonText)
             outfile.text = prettyJson
             exportedFiles << outfile
-            log.debug "exported index pipeline with id ($id) to file: ${outfile.absolutePath}"
+            log.info "\t\texported index pipeline with id ($id) to file: ${outfile.absolutePath}"
 
             def jsStages = pipeline.stages.findAll { ((String) it.type).containsIgnoreCase('javascript') }
             jsStages.each {
@@ -80,6 +80,16 @@ class Pipelines extends BaseObject {
                 log.info "\t\twrote javascript (helper) file: ${jsOutfile.absolutePath}"
             }
 
+            File outStageFolder = new File(exportFolder, 'stages')
+            def rc = Helper.getOrMakeDirectory(outStageFolder)
+            pipeline.stages.each { def stage ->
+                log.debug "stage to export: ${stage.type}"
+                File f = new File(outStageFolder, "${stage.type}.${outname}.${stage.id}.json")
+                String jsonTextStage = jsonDefaultOutput.toJson(stage)
+                String prettyJsonStage = JsonOutput.prettyPrint(jsonTextStage)
+                f.text = prettyJsonStage
+                exportedFiles << f
+            }
         }
         return exportedFiles
     }
