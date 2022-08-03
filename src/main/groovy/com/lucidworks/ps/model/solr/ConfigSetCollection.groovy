@@ -86,6 +86,7 @@ class ConfigSetCollection extends BaseObject{
             log.debug "\t\t exported configset $name"
         }
         log.info "exported config sets with  keys: ${configsetMap.keySet()}"
+        return exportFolder
     }
 
     @Override
