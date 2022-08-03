@@ -57,7 +57,7 @@ public class BaseObject {
      * @param srcJsonList
      */
     BaseObject(String appName, Map<String, Object> srcJsonMap) {
-        log.info "$itemType: constructor(String appName, MAP jsonmap)... (uncommon to get a map rather than list...)"
+        log.debug "$itemType: constructor(String appName, MAP jsonmap)... (uncommon to get a map rather than list...)"
         this.srcJsonMap = srcJsonMap
         this.appName = appName
         srcItems = srcJsonMap
@@ -67,7 +67,7 @@ public class BaseObject {
     String export(Map rules = [set:[], remove:[/created|lastUpdated/]]) {
         String s = null
         if(srcItems){
-            log.info "export srcItems to String (override for non-strings and anything else that did not come from a JsonSluper..."
+            log.debug "export srcItems to String (override for non-strings and anything else that did not come from a JsonSluper..."
             String json = jsonDefaultOutput.toJson(srcItems)
             String pretty = JsonOutput.prettyPrint(json)
             s = pretty
@@ -90,7 +90,7 @@ public class BaseObject {
 //                if(name.endsWith()
                 outFile = new File(exportFolder, name+'.json')
                 String json = toJson(it)
-                log.info "$itemType::$name) ${it.size()}"
+                log.debug "$itemType::$name) ${it.size()}"
                 outFile.text = json
             }
         } else if (srcJsonMap) {
@@ -98,7 +98,7 @@ public class BaseObject {
                 String name = Helper.sanitizeFilename("${key}.json")
                 outFile = new File(exportFolder, name)
                 String json = toJson(val)
-                log.info "Key ($key) --> val ($val)"
+                log.debug "Key ($key) --> val ($val)"
                 outFile.text = json
             }
         } else {
@@ -191,7 +191,7 @@ public class BaseObject {
         Integer sumComplexity = Integer.valueOf(0)
         Map complexityAssessment = [assessmentType: this.itemType, size: size(), complexity: sumComplexity, items: []]
         if (srcJsonList) {
-            log.info "Assess complexity (${itemType}) with ${size()} LIST Items..."
+            log.debug "Assess complexity (${itemType}) with ${size()} LIST Items..."
             srcJsonList.each {
                 def assessment = assessItem(it)
                 sumComplexity += assessment.complexity
@@ -199,7 +199,7 @@ public class BaseObject {
             }
         } else if (srcJsonMap) {
 //            log.warn "\t\t(${this.itemType}) Map processing... not implemented yet...?"
-            log.info "Assess complexity (${itemType}) with ${size()} MAP entries..."
+            log.debug "Assess complexity (${itemType}) with ${size()} MAP entries..."
             srcJsonMap.each { def key, def val ->
                 log.debug "\t\tKey ($key) --> val ($val)"
                 def assessment = assessItem(key, val)
@@ -211,7 +211,7 @@ public class BaseObject {
                 complexityAssessment.items << assessment
             }
         } else if (this.itemType.startsWith('ConfigSet')) {
-            log.info "Base object assessComplexity() called, but all assessment should be done in child class method... (ignore me) "
+            log.debug "Base object assessComplexity() called, but all assessment should be done in child class method... (ignore me) "
         } else {
 
             log.warn "Unknown thing type ${this.itemType}) to export: $this (no srcJsonMap or srcJsonList...??)"
