@@ -1,4 +1,4 @@
-package com.lucidworks.ps.clients
+package com.lucidworks.ps.model.solr
 
 import org.apache.log4j.Logger
 import org.apache.solr.client.solrj.SolrClient
