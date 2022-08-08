@@ -17,6 +17,7 @@ class FusionClientArgParser {
         cli.with {
             h longOpt: 'help', 'Show usage information'
             a longOpt: 'appName', args: 1, required: false, argName: 'AppName', 'Application name to work on (optional, but required for some operations...)'
+            c longOpt: 'config', args: 1, required: false, argName: 'ConfigFile', "Configuration file (for ConfigSlurper)"
             f longOpt: 'fusionUrl', args: 1, required: true, argName: 'url', 'MAIN/Destination Fusion url with protocol, host, and port (if any)--for new/migrated app'
             g longOpt: 'groupLabel', args: 1, required: false, argName: 'group', defaultValue: 'TestGroup', 'Label for archiving/grouping objects; app name, environment, project,... freeform and optional'
             m longOpt: 'mappingDir', args: 1, required: false, argName: 'dir', 'Folder containing object mapping instructions (subfolders grouped by object type)'
@@ -25,10 +26,6 @@ class FusionClientArgParser {
             u longOpt: 'user', args: 1, argName: 'user', required: true, 'the fusion user to authenticate with for MAIN/dest fusion'
             x longOpt: 'exportDir', args: 1, required: false, argName: 'dir', 'Export directory'
 
-//            w longOpt: 'whichApp', args: 1, required: false, argName: 'srcApp', 'Which SOURCE app to read from (if different from "appName"), eg /opt/lucidworks/fusion/exports/myApp.zip'
-//            x longOpt: 'srcFusionUrl', args:1, required: false, argName: 'url', 'the fusion url to read from SOURCE fusion (read only), eg https://my.fusion.com:8764/'
-//            y longOpt: 'srcUser', args:1, required: false, argName: 'user', 'the username to authenticate to SOURCE fusion (read only)'
-//            z longOpt: 'srcPass', args:1, required: false, argName: 'password', 'the password to authenticate to SOURCE fusion (read only)'
         }
 
 
@@ -44,6 +41,10 @@ class FusionClientArgParser {
         }
         if(options.exportDir){
             def foo = Helper.getOrMakeDirectory(options.exportDir)
+            log.info "Export dir: $foo"
+        }
+        if(options.config){
+            log.info "Config source: ${options.config}"
         }
         options
     }

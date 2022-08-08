@@ -197,6 +197,7 @@ class FusionClient {
         return request
     }
 
+
     /**
      * encapsulate put (update/replace) requests
      * @param url
@@ -788,7 +789,7 @@ class FusionClient {
         FusionResponseWrapper fusionResponse = new FusionResponseWrapper(request, response)
 
         responses << fusionResponse // add this response to the client's collection of responses
-        if(fusionResponse.wasSuccess()) {
+        if (fusionResponse.wasSuccess()) {
             log.debug "successful request/response: $fusionResponse"
         } else {
             log.warn "UNSUCCESSFUL request/response: $fusionResponse"
@@ -1243,7 +1244,7 @@ class FusionClient {
                 log.info "More than one source Datasource connector for type ($type) -- used connectors: $usedConnectorsByType???"
             }
             log.debug "\t\tUsed: '$type' with (${usedDataSources.size()}) datasources "
-            List<Map<String, String>> installedMatches = connectorsInstalled.findAll {it.type.containsIgnoreCase(type) }
+            List<Map<String, String>> installedMatches = connectorsInstalled.findAll { it.type.containsIgnoreCase(type) }
 
             if (installedMatches) {
                 if (installedMatches.size() > 1) {
@@ -1443,7 +1444,7 @@ class FusionClient {
         // get map of existing links (faster lookups...?)
         srcFusionObjects['dataSources'].each { Map<String, Object> p ->
             String dsName = p.id
-            def existingDS = dsExisting.find {it.id == dsName }
+            def existingDS = dsExisting.find { it.id == dsName }
 
             if (existingDS) {
                 log.info "\t\tSKIPPING existing datasource: $dsName"
@@ -1628,6 +1629,16 @@ class FusionClient {
             log.warn "Faled to get Object links!!?! Response wrapper: $fusionResponseWrapper"
         }
         return schema
+
+    }
+
+    def blobUpload(String path, String resourceType, def blob) {
+        // {{furl}}//api/apollo/apps/{{app}}/blobs?resourceType=file
+        //http://lucy:6764/api/apps/test/blobs/lib/test.js/FusionServiceLib.js?resourceType=file
+        String url = "$fusionBase/api/apps/${app}/blobs/${path}?resourceType=${resourceType}"
+        log.info "\t\t Blob UPLOAD -- path:${path}) type(${resourceType}) blob class name: ${blob.getClass().simpleName}"
+        HttpRequest request = buildPutRequest(url, blob)
+        FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
 
     }
 
