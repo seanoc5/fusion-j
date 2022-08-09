@@ -201,52 +201,91 @@ class FusionClient {
     /**
      * encapsulate put (update/replace) requests
      * @param url
-     * @param jsonToIndex
+     * @param payload
      * @return
      */
-    HttpRequest buildPutRequest(String url, def jsonToIndex) {
+    HttpRequest buildPutRequest(String url, def payload) {
         String json = null
-        if (jsonToIndex instanceof String) {
+        HttpRequest request
+        if (payload instanceof String) {
             log.debug "Got a string, no json builder needed"
-            json = jsonToIndex
-        } else {
-            JsonBuilder jsonBuilder = new JsonBuilder(jsonToIndex)
+            json = payload
+            request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofMinutes(1))
+                    .header("Content-Type", "application/json")
+                    .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
+                    .PUT(HttpRequest.BodyPublishers.ofString(json))
+                    .build()
+        } else if(payload instanceof File || payload instanceof Path){
+            Path uploadPath= payload
+            request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofMinutes(1))
+//                    .header("Content-Type", "application/json")
+                    .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
+                    .PUT(HttpRequest.BodyPublishers.ofFile(uploadPath))
+                    .build()
+            log.info "Upload file: ${uploadPath.toAbsolutePath()}"
+
+
+        } else if(payload instanceof Map || payload instanceof Collection){
+            JsonBuilder jsonBuilder = new JsonBuilder(payload)
             json = jsonBuilder.toString()
-            log.debug "converted object($jsonToIndex) to Json string (${json}) for indexing"
+            log.debug "converted object($payload) to Json string (${json}) for indexing"
+            request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofMinutes(1))
+                    .header("Content-Type", "application/json")
+                    .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
+                    .PUT(HttpRequest.BodyPublishers.ofString(json))
+                    .build()
         }
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofMinutes(1))
-                .header("Content-Type", "application/json")
-                .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
-                .PUT(HttpRequest.BodyPublishers.ofString(json))
-                .build()
         return request
     }
 
     /**
      * encapsulate POST (create) requests
      * @param url
-     * @param jsonToIndex
+     * @param payload
      * @return
      */
-    HttpRequest buildPostRequest(String url, def jsonToIndex) {
+    HttpRequest buildPostRequest(String url, def payload) {
         String json = null
-        if (jsonToIndex instanceof Collection) {
+        HttpRequest request
+        if (payload instanceof Collection) {
             JsonBuilder jsonBuilder = new JsonBuilder(map)
             json = jsonBuilder.toString()
-            log.debug "converted object($jsonToIndex) to Json string (${json}) for indexing"
+            log.debug "converted object($payload) to Json string (${json}) for indexing"
+            request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofMinutes(1))
+                    .header("Content-Type", "application/json")
+                    .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
+                    .POST(HttpRequest.BodyPublishers.ofString(json))
+                    .build()
+        } else if (payload instanceof Path) {
+            Path uploadPath = payload
+            log.info "Upload file: ${uploadPath.toAbsolutePath()}"
+            request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofMinutes(1))
+//                    .header("Content-Type", "application/json")
+                    .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
+                    .PUT(HttpRequest.BodyPublishers.ofFile(uploadPath))
+                    .build()
+
         } else {
-            json = jsonToIndex
+            json = payload
+            request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofMinutes(1))
+                    .header("Content-Type", "application/json")
+                    .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
+                    .POST(HttpRequest.BodyPublishers.ofString(json))
+                    .build()
         }
 
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofMinutes(1))
-                .header("Content-Type", "application/json")
-                .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
-                .POST(HttpRequest.BodyPublishers.ofString(json))
-                .build()
         return request
     }
 
@@ -805,6 +844,14 @@ class FusionClient {
     List<Map<String, Object>> getCollections(String appName) {
         String url = "$fusionBase/api/apps/${appName}/collections"
         log.info "List collections for app $appName url: $url "
+        HttpRequest request = buildGetRequest(url)
+        FusionResponseWrapper responseWrapper = sendFusionRequest(request)
+        return responseWrapper.parsedInfo
+    }
+
+    List<Map<String, Object>> getCollection(String appName, String collectionName) {
+        String url = "$fusionBase/api/apps/${appName}/collections/$collectionName"
+        log.info "List collection:($collectionName) for app $appName url: $url "
         HttpRequest request = buildGetRequest(url)
         FusionResponseWrapper responseWrapper = sendFusionRequest(request)
         return responseWrapper.parsedInfo
@@ -1632,7 +1679,7 @@ class FusionClient {
 
     }
 
-    def blobUpload(String path, String resourceType, def blob) {
+    def blobUpload(String app, String path, String resourceType, def blob) {
         // {{furl}}//api/apollo/apps/{{app}}/blobs?resourceType=file
         //http://lucy:6764/api/apps/test/blobs/lib/test.js/FusionServiceLib.js?resourceType=file
         String url = "$fusionBase/api/apps/${app}/blobs/${path}?resourceType=${resourceType}"
