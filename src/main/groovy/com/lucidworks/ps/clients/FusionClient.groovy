@@ -90,7 +90,13 @@ class FusionClient {
      * @param options
      */
     FusionClient(OptionAccessor options) {
-        fusionBase = options.f
+        if(options.f.endsWith('/')) {
+            fusionBase = options.f[0..-2]
+            log.info "Remove trailing slash from options.f (fusionBase: ${options.f}) -> $fusionBase"
+        } else {
+            fusionBase = options.f
+            log.debug "Standard fusion base: $fusionBase"
+        }
         user = options.u                            // fusion username for destination of new/migrated app
         password = options.p
         if (options.appName) {
@@ -253,13 +259,13 @@ class FusionClient {
     HttpRequest buildPostRequest(String url, def payload) {
         String json = null
         HttpRequest request
-        if (payload instanceof Collection) {
+        if (payload instanceof Collection || payload instanceof Map) {
             JsonBuilder jsonBuilder = new JsonBuilder(map)
             json = jsonBuilder.toString()
             log.debug "converted object($payload) to Json string (${json}) for indexing"
             request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
-                    .timeout(Duration.ofMinutes(1))
+                    .timeout(Duration.ofMinutes(3))
                     .header("Content-Type", "application/json")
                     .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
                     .POST(HttpRequest.BodyPublishers.ofString(json))
@@ -269,7 +275,7 @@ class FusionClient {
             log.info "Upload file: ${uploadPath.toAbsolutePath()}"
             request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
-                    .timeout(Duration.ofMinutes(1))
+                    .timeout(Duration.ofMinutes(3))
 //                    .header("Content-Type", "application/json")
                     .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
                     .PUT(HttpRequest.BodyPublishers.ofFile(uploadPath))
@@ -279,7 +285,7 @@ class FusionClient {
             json = payload
             request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
-                    .timeout(Duration.ofMinutes(1))
+                    .timeout(Duration.ofMinutes(3))
                     .header("Content-Type", "application/json")
                     .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
                     .POST(HttpRequest.BodyPublishers.ofString(json))
@@ -849,29 +855,29 @@ class FusionClient {
         return responseWrapper.parsedInfo
     }
 
-    List<Map<String, Object>> getCollection(String appName, String collectionName) {
+    FusionResponseWrapper getCollection(String appName, String collectionName) {
         String url = "$fusionBase/api/apps/${appName}/collections/$collectionName"
         log.info "List collection:($collectionName) for app $appName url: $url "
         HttpRequest request = buildGetRequest(url)
         FusionResponseWrapper responseWrapper = sendFusionRequest(request)
-        return responseWrapper.parsedInfo
+        return responseWrapper
     }
 
 
     /**
      * Create a collection in the given fusion application.
      * Note: the defaultFeatures controls things like signals sidecar collections, query rewrite, etc.
-     * @param collection
+     * @param collectionMap
      * @param appName
      * @param defaultFeatures (set to false, since user is likely to create an app, which would have primary coll with default features) --here we assume supporting collections
      * @return
      */
-    FusionResponseWrapper createCollection(Map<String, Object> collection, String appName, boolean defaultFeatures = false) {
+    FusionResponseWrapper createCollection(Map<String, Object> collectionMap, String appName, boolean defaultFeatures = false) {
         FusionResponseWrapper responseWrapper = null
-        String collName = collection.id
-        JsonBuilder jsonBuilder = new JsonBuilder([id: collName])
+        String collName = collectionMap.id
+        JsonBuilder jsonBuilder = new JsonBuilder(collectionMap)
         String jsonToIndex = jsonBuilder.toString()
-        log.warn "REvisit collection creation process, this call is doing a naive/vanilla collection creation: $jsonToIndex"
+        log.warn "Revisit collection creation process, this call is doing a naive/vanilla collection creation: $jsonToIndex"
         try {
             String url = "$fusionBase/api/apps/${appName}/collections"      // todo: add defaultFeatures?
             log.info "\t Create COLLECTION ($collName) url: $url -- Json text size::\t ${jsonToIndex.size()}"
