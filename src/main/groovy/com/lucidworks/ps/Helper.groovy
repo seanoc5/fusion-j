@@ -61,5 +61,18 @@ class Helper {
     static String sanitizeFilename(String name, String substitute = '_', String regex = "[^a-zA-Z0-9\\.\\-]") {
         String sanitized = name.replaceAll(regex, substitute);
     }
+
+    static boolean isJson(def body) {
+        if(body instanceof String){
+            if(body.trim().startsWith('{') || body.trim().startsWith('[')){
+                return true
+            } else {
+                log.info "Body did not start with curly or square bracket, assuming not json. First few characters: " + body[0..(Math.min(10, body.size()))]
+            }
+        } else {
+            log.info "Body was not a string, but rather class: ${body.getClass().name} -- not json"
+        }
+        false
+    }
 }
 
