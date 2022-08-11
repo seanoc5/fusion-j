@@ -223,8 +223,8 @@ class FusionClient {
                     .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
                     .PUT(HttpRequest.BodyPublishers.ofString(json))
                     .build()
-        } else if(payload instanceof File || payload instanceof Path){
-            Path uploadPath= payload
+        } else if (payload instanceof File || payload instanceof Path) {
+            Path uploadPath = payload
             request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .timeout(Duration.ofMinutes(1))
@@ -235,7 +235,7 @@ class FusionClient {
             log.info "Upload file: ${uploadPath.toAbsolutePath()}"
 
 
-        } else if(payload instanceof Map || payload instanceof Collection){
+        } else if (payload instanceof Map || payload instanceof Collection) {
             JsonBuilder jsonBuilder = new JsonBuilder(payload)
             json = jsonBuilder.toString()
             log.debug "converted object($payload) to Json string (${json}) for indexing"
@@ -838,6 +838,22 @@ class FusionClient {
             log.debug "successful request/response: $fusionResponse"
         } else {
             log.warn "UNSUCCESSFUL request/response: $fusionResponse"
+            String body = response.body()
+            if(Helper.isJson(body)){
+                def json = new JsonSlurper().parseText(body)
+                if(fusionResponse.statusMessage){
+                    fusionResponse.statusMessage += "\n" + json
+                } else {
+                    if(json.type == 'RESTError') {
+                        fusionResponse.statusMessage = "${json.type} (${json.httpStatusCode}): ${json.message} :: ${json.details}"
+
+                    } else {
+                        fusionResponse.statusMessage = json.toString()
+                    }
+                }
+            } else {
+                log.warn "Response body was not Json!! + $body"
+            }
         }
         return fusionResponse
     }
@@ -849,7 +865,7 @@ class FusionClient {
      */
     List<Map<String, Object>> getCollections(String appName) {
         String url = "$fusionBase/api/apps/${appName}/collections"
-        log.info "List collections for app $appName url: $url "
+        log.debug "List collections for app $appName url: $url "
         HttpRequest request = buildGetRequest(url)
         FusionResponseWrapper responseWrapper = sendFusionRequest(request)
         return responseWrapper.parsedInfo
@@ -879,10 +895,11 @@ class FusionClient {
         String jsonToIndex = jsonBuilder.toString()
         log.warn "Revisit collection creation process, this call is doing a naive/vanilla collection creation: $jsonToIndex"
         try {
-            String url = "$fusionBase/api/apps/${appName}/collections/${collectionName}"      // todo: add defaultFeatures?
-            log.info "\t Create COLLECTION ($collName) url: $url -- Json text size::\t ${jsonToIndex.size()}"
-            HttpRequest request = buildPutRequest(url, jsonToIndex)
-//            HttpRequest request = buildPostRequest(url, jsonToIndex)
+            String url = "$fusionBase/api/apps/${appName}/collections"      // todo: add defaultFeatures?
+//            String url = "$fusionBase/api/apps/${appName}/collections/${collectionName}"      // todo: add defaultFeatures?
+            log.info "\t Create COLLECTION ($collName) url: $url -- Json text::\t ${jsonToIndex}"
+//            HttpRequest request = buildPutRequest(url, jsonToIndex)
+            HttpRequest request = buildPostRequest(url, jsonToIndex)
             responseWrapper = sendFusionRequest(request)
             log.info "\t\tcreate collection respose: $responseWrapper"
         } catch (IllegalArgumentException iae) {
@@ -1693,7 +1710,22 @@ class FusionClient {
         log.info "\t\t Blob UPLOAD -- path:${path}) type(${resourceType}) blob class name: ${blob.getClass().simpleName}"
         HttpRequest request = buildPutRequest(url, blob)
         FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
-
+        return fusionResponseWrapper
     }
 
+    def getBlobs(String app = '', String resourceType = '') {
+        String url
+        if (app) {
+            url = "${fusionBase}/api/apollo/apps/{{app}}/blobs"
+        } else {
+            url = "${fusionBase}/api/blobs"
+        }
+        if (resourceType) {
+            url += "?resourceType=${resourceType}"
+        }
+        log.info "\t\t Get blobs -- app:${app}  -- type(${resourceType})"
+        HttpRequest request = buildGetRequest(url)
+        FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
+        return fusionResponseWrapper
+    }
 }
