@@ -262,7 +262,6 @@ class FusionClient {
         if (payload instanceof Collection || payload instanceof Map) {
             JsonBuilder jsonBuilder = new JsonBuilder(map)
             json = jsonBuilder.toString()
-            log.debug "converted object($payload) to Json string (${json}) for indexing"
             request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .timeout(Duration.ofMinutes(3))
@@ -270,6 +269,7 @@ class FusionClient {
                     .setHeader("User-Agent", "Java 11+ HttpClient Bot") // add request header
                     .POST(HttpRequest.BodyPublishers.ofString(json))
                     .build()
+            log.debug "converted object($payload) to Json string (${json}) for indexing"
         } else if (payload instanceof Path) {
             Path uploadPath = payload
             log.info "Upload file: ${uploadPath.toAbsolutePath()}"
@@ -872,16 +872,17 @@ class FusionClient {
      * @param defaultFeatures (set to false, since user is likely to create an app, which would have primary coll with default features) --here we assume supporting collections
      * @return
      */
-    FusionResponseWrapper createCollection(Map<String, Object> collectionMap, String appName, boolean defaultFeatures = false) {
+    FusionResponseWrapper createCollection(String collectionName, Map<String, Object> collectionMap, String appName, boolean defaultFeatures = false) {
         FusionResponseWrapper responseWrapper = null
         String collName = collectionMap.id
         JsonBuilder jsonBuilder = new JsonBuilder(collectionMap)
         String jsonToIndex = jsonBuilder.toString()
         log.warn "Revisit collection creation process, this call is doing a naive/vanilla collection creation: $jsonToIndex"
         try {
-            String url = "$fusionBase/api/apps/${appName}/collections"      // todo: add defaultFeatures?
+            String url = "$fusionBase/api/apps/${appName}/collections/${collectionName}"      // todo: add defaultFeatures?
             log.info "\t Create COLLECTION ($collName) url: $url -- Json text size::\t ${jsonToIndex.size()}"
-            HttpRequest request = buildPostRequest(url, jsonToIndex)
+            HttpRequest request = buildPutRequest(url, jsonToIndex)
+//            HttpRequest request = buildPostRequest(url, jsonToIndex)
             responseWrapper = sendFusionRequest(request)
             log.info "\t\tcreate collection respose: $responseWrapper"
         } catch (IllegalArgumentException iae) {
@@ -1361,7 +1362,7 @@ class FusionClient {
                 log.debug "\t\tSkipped existing collection ($newCollname): $existingColl"
             } else {
                 boolean defaultFeatures = false
-                FusionResponseWrapper responseWrapper = createCollection(coll, appName, defaultFeatures)
+                FusionResponseWrapper responseWrapper = createCollection(newCollname, coll, appName, defaultFeatures)
                 if (responseWrapper.wasSuccess()) {
                     log.debug "\t\tCreated Collection: ($coll)"
                 } else {
