@@ -39,6 +39,8 @@ class FusionClient {
     String fusionBase = null
     String appName = null
     HttpClient httpClient = null
+    String versionString = 'n.a.'
+    int majorVersion = -1
 
     private String sessionCookie = null
     File objectsJsonFile = null
@@ -190,17 +192,10 @@ class FusionClient {
             throw new IllegalArgumentException("Could not get valid cllient with session call, bailing by rethrowing error")
         }
 
-        String urlInfo = "${baseUrl}/api"
-        HttpRequest requestInfo = buildGetRequest(urlInfo)
+        this.httpClient = client
+        def info = getFusionInformation()
 
-        HttpResponse<String> responseInfo = client.send(requestInfo, HttpResponse.BodyHandlers.ofString())
-        FusionResponseWrapper fusionResponseWrapperInfo = new FusionResponseWrapper(request, response)
-        responses << fusionResponseWrapperInfo
-        if (responseInfo.statusCode() < 300) {
-            def info = fusionResponseWrapperInfo.getParsedInfo()
-        }
-
-
+        // todo -- revisit returning the client, versus setting it above; doing both because I feel getting fusion info/version is part of building the client and general awareness (different urls between different fusions
         return client
     }
 
@@ -370,6 +365,7 @@ class FusionClient {
      * @return
      */
     def getFusionInformation() {
+        String url = "$fusionBase/api"
         JsonSlurper jsonSlurper = new JsonSlurper()
         HttpRequest request = buildGetRequest(url)
 
@@ -379,6 +375,18 @@ class FusionClient {
             log.debug("Response from getFusionInformation() ${response.statusCode()}")
             apiInfo = jsonSlurper.parseText(response.body())
             log.debug "Fusion API info: $apiInfo"
+            versionString = apiInfo.version
+            if(versionString) {
+                if (versionString == 'localhost') {
+                    log.warn "\t\tVersion (${versionString}) unclear, assuming 4.x..."
+                    majorVersion = 4
+                } else if (versionString.startsWith('5')) {
+                    majorVersion = 5
+                    log.info "Found version string: '${versionString}' which looks like major version (${majorVersion})"
+                }
+            } else {
+                log.warn "No version entry found from API call... WTH...? what version is this...? API info returned: \n$apiInfo"
+            }
         } else {
             log.warn "Could not get valid API information: ${this.fusionBase}"
         }
@@ -392,13 +400,13 @@ class FusionClient {
 //                .header("Content-Type", "application/json")
                 .build()
 
-        HttpResponse<String> respIntro = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+        HttpResponse<String> respIntro = httpClient.send(reqIntro, HttpResponse.BodyHandlers.ofString())
         rc = respIntro.statusCode()
         if (rc >= 200 && rc < 300) {
 
-            log.debug("Response introspection result code: ${respIntro.statusCode()}")
-            introspectInfo = jsonSlurper.parseText(response.body())
-            log.debug "\tFusion Introspection info: $introspectInfo"
+            log.info("Response introspection result code: ${respIntro.statusCode()}")
+            introspectInfo = jsonSlurper.parseText(respIntro.body())
+            log.info "\tFusion Introspection info (keys only): ${introspectInfo.keySet()}"
         } else {
             log.warn "Could not get valid Introspection information: ${this.fusionBase}"
         }

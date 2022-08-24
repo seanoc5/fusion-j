@@ -11,7 +11,7 @@ import java.net.http.HttpResponse
  */
 class FusionClientTest extends Specification {
     String appName= 'test'
-    String furl = 'http://localhost:8764/'
+    String furl = 'http://newmac:8764/'
     FusionClient client = new FusionClient(furl, 'sean', 'pass1234', appName)
 
     def "test buildClient"() {
