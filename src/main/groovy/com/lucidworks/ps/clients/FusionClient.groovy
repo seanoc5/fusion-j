@@ -58,8 +58,8 @@ class FusionClient {
      * @param user
      * @param pass
      */
-    FusionClient(String baseUrl, String user, String pass) {
-        this(new URL(baseUrl), user, pass)
+    FusionClient(String baseUrl, String user, String pass, String app = null) {
+        this(new URL(baseUrl), user, pass, app)
     }
 
 
@@ -69,10 +69,14 @@ class FusionClient {
      * @param user
      * @param pass
      */
-    FusionClient(URL baseUrl, String user, String pass) {
+    FusionClient(URL baseUrl, String user, String pass, String app = null) {
         this.fusionBase = baseUrl
         this.user = user
         this.password = pass
+        if (app) {
+            log.debug "Setting app: $app"
+            appName = app
+        }
 
         String s = baseUrl.toString()
         if (s.endsWith('/')) {
@@ -90,7 +94,7 @@ class FusionClient {
      * @param options
      */
     FusionClient(OptionAccessor options) {
-        if(options.f.endsWith('/')) {
+        if (options.f.endsWith('/')) {
             fusionBase = options.f[0..-2]
             log.info "Remove trailing slash from options.f (fusionBase: ${options.f}) -> $fusionBase"
         } else {
@@ -159,29 +163,43 @@ class FusionClient {
         // groovy string template for speed, rather than json builder
         String authJson = """{"username":"$user", "password":"$pass"}"""
 
+        // start a session for this client to use
+        // todo -- check for stale cookies, etc
         String urlSession = "${baseUrl}/api/session"
         log.info "\t\tInitializing Fusion client session via POST to session url: $urlSession"
 
-//        try {
-        HttpRequest request = buildPostRequest(urlSession, authJson)
+        try {
+            HttpRequest request = buildPostRequest(urlSession, authJson)
 
-        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString())
-        FusionResponseWrapper fusionResponseWrapper = new FusionResponseWrapper(request, response)
-        responses << fusionResponseWrapper
-        if (response.statusCode() < 300) {
-            log.debug("\t\tResponse status: " + response.statusCode())
-            sessionCookie = response.headers().firstValue("set-cookie")
-            cookieMS = System.currentTimeMillis()
-            Date ts = new Date(cookieMS)
-            log.debug("\tSession cookie: ${this.sessionCookie} set/refreshed at timestamp: $cookieMS (${ts})")
-        } else {
-            log.error "Bad status code creating client (incorrect auth??), Status Code: ${response.statusCode()} -- body: ${response.body()}"
-            throw new AuthenticationException("Could not create Fusion Client (${response.body()})")
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString())
+            FusionResponseWrapper fusionResponseWrapper = new FusionResponseWrapper(request, response)
+            responses << fusionResponseWrapper
+            if (response.statusCode() < 300) {
+                log.debug("\t\tResponse status: " + response.statusCode())
+                sessionCookie = response.headers().firstValue("set-cookie")
+                cookieMS = System.currentTimeMillis()
+                Date ts = new Date(cookieMS)
+                log.debug("\tSession cookie: ${this.sessionCookie} set/refreshed at timestamp: $cookieMS (${ts})")
+            } else {
+                log.error "Bad status code creating client (incorrect auth??), Status Code: ${response.statusCode()} -- body: ${response.body()}"
+                throw new AuthenticationException("Could not create Fusion Client (${response.body()})")
+            }
+        } catch (Exception e) {
+            log.warn "Problem getting client: $e"
+            client = null
+            throw new IllegalArgumentException("Could not get valid cllient with session call, bailing by rethrowing error")
         }
-//        } catch (Exception e) {
-//            log.warn "Problem getting client: $e"
-//            client = null
-//        }
+
+        String urlInfo = "${baseUrl}/api"
+        HttpRequest requestInfo = buildGetRequest(urlInfo)
+
+        HttpResponse<String> responseInfo = client.send(requestInfo, HttpResponse.BodyHandlers.ofString())
+        FusionResponseWrapper fusionResponseWrapperInfo = new FusionResponseWrapper(request, response)
+        responses << fusionResponseWrapperInfo
+        if (responseInfo.statusCode() < 300) {
+            def info = fusionResponseWrapperInfo.getParsedInfo()
+        }
+
 
         return client
     }
@@ -839,12 +857,12 @@ class FusionClient {
         } else {
             log.warn "UNSUCCESSFUL request/response: $fusionResponse"
             String body = response.body()
-            if(Helper.isJson(body)){
+            if (Helper.isJson(body)) {
                 def json = new JsonSlurper().parseText(body)
-                if(fusionResponse.statusMessage){
+                if (fusionResponse.statusMessage) {
                     fusionResponse.statusMessage += "\n" + json
                 } else {
-                    if(json.type == 'RESTError') {
+                    if (json.type == 'RESTError') {
                         fusionResponse.statusMessage = "${json.type} (${json.httpStatusCode}): ${json.message} :: ${json.details}"
 
                     } else {
