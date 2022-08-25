@@ -73,12 +73,16 @@ class Javascript extends BaseObject {
                         type = 'variable init'
                         break
                     case ~/(.*= *)?\w+\.\w+\(.*\).*/:           // overlap with control statements,but we are most concerned with function calls for evaluation
-                        type = 'method call'
+                        if(itemName =~ /doc(ument)?\.(add|set|remove)/){
+                            type = 'doc adjustment'
+                        } else {
+                            type = 'method call'
+                        }
                         break
                     case ~/(\w+) *[+-]?=.*\w+.*/:
                         type = 'variable assignment'
                         break
-                    case ~/function *(\w+)?\(.*\) *\{/:
+                    case ~/function *(\w+)?\(.*\) *\{?/:
                         type = 'function declaration'
                         break
                     case ~/(if *\(.*\)|[} ]*else\b[{ (]*).*/:
@@ -112,7 +116,7 @@ class Javascript extends BaseObject {
                         break
 
                     case ~/(return\b.*|doc;?|document;?)/:
-                        type = 'syntax'
+                        type = 'return'
                         break
 
                     default:
