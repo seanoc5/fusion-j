@@ -12,7 +12,8 @@ class IndexPipelines extends Pipelines {
 
     IndexPipelines(String applicationName, List<Map<String, Object>> items) {
         super(applicationName, items)
-        log.debug "Javascript stages: $javascriptStages"
+        log.info  "\t\t(${this.itemType}) pipelines count: ${this.srcItems.size()}"
+        log.debug "(${this.itemType}) Javascript stages: $javascriptStages"
     }
 
 //    def getJavascriptStages(){
