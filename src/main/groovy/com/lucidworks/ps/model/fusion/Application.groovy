@@ -8,6 +8,7 @@ import org.apache.log4j.Logger
 
 import java.util.regex.Pattern
 import java.util.zip.ZipEntry
+import java.util.zip.ZipException
 import java.util.zip.ZipFile
 
 /**
@@ -57,7 +58,8 @@ class Application extends BaseObject {
     Map<String, String> queryRewriteJson = [:]
     Map<String, Object> queryRewriteRules = [:]
 
-    Map<String, Object> unknownItems = [:]  // map of items (from zip file export??) that we do not (yet) explicitly handle...
+    Map<String, Object> unknownItems = [:]
+    // map of items (from zip file export??) that we do not (yet) explicitly handle...
 
     /**
      * helper main function to test functionality, change the file arg accordingly...
@@ -73,74 +75,77 @@ class Application extends BaseObject {
 
     Application(File appOrJson) {
         log.info "Parsing source file: ${appOrJson.absolutePath} (app export, or json...)"
-        def parseResult = parseSourceFile(appOrJson)
-//        this.jsonItems = parseResult
+        parseSourceFile(appOrJson)
+//        def parseResult = parseSourceFile(appOrJson)
+        if (exportedObjectsSourceMap) {
+            // todo -- move all this setup code to a more flexible method
+            Map<String, Object> parsedObjects = exportedObjectsSourceMap.objects
 
-        // todo -- move all this setup code to a more flexible method
-        Map<String, Object> parsedObjects = exportedObjectsSourceMap.objects
+            if (parsedObjects.metadata) {
+                this.metadata = exportedObjectsSourceMap.metadata
+            }
+            if (parsedObjects.appProperties) {
+                this.appProperties = parsedObjects['properties']
+            }
 
-        if (parsedObjects.metadata) {
-            this.metadata = exportedObjectsSourceMap.metadata
-        }
-        if (parsedObjects.appProperties) {
-            this.appProperties = parsedObjects['properties']
-        }
+            if (parsedObjects.configsets) {
+                log.warn "Found configsets in parsedObjects json...??!? this is unexpected, but we will try to process anyhow...."
+                configsets = new ConfigSetCollection((Map) exportedObjectsSourceMap.configsets, appName)
+            } else {
+                log.debug "\t\tNo configsets in parsedObjects source (this is expected)"
+            }
+            if (parsedObjects.collections) {
+                collections = new Collections(appName, (List) parsedObjects.collections)
+            }
+            if (parsedObjects.dataSources) {
+                dataSources = new DataSources(appName, parsedObjects.dataSources)
+            }
+            if (parsedObjects.indexPipelines) {
+                indexPipelines = new IndexPipelines(appName, parsedObjects.indexPipelines)
+            }
+            if (parsedObjects.indexProfiles) {
+                indexProfiles = new IndexProfiles(appName, parsedObjects.indexProfiles)
+            }
+            if (parsedObjects.queryPipelines) {
+                queryPipelines = new QueryPipelines(appName, parsedObjects.queryPipelines)
+            }
+            if (parsedObjects.queryProfiles) {
+                queryProfiles = new QueryProfiles(appName, parsedObjects.queryProfiles)
+            }
+            if (parsedObjects.parsers) {
+                parsers = new Parsers(appName, parsedObjects.parsers)
+            }
+            if (parsedObjects.blobs) {
+                blobs = new Blobs(appName, parsedObjects.blobs)
+            } else {
+                log.info "\t\tno blobs available (subset of appexport or pre F4...?)"
+            }
+            if (parsedObjects.appkitApps) {
+                appkitApps = new AppKits(appName, parsedObjects.appkitApps)
+            } else {
+                log.info "\t\tno Appkit apps found; this is fine--unless you have appkit apps...?"
+            }
+            if (parsedObjects.features) {
+                features = new Features(appName, parsedObjects.features)
+            }
 
-        if (parsedObjects.configsets) {
-            log.warn "Found configsets in parsedObjects json...??!? this is unexpected, but we will try to process anyhow...."
-            configsets = new ConfigSetCollection((Map) exportedObjectsSourceMap.configsets, appName)
+            if (parsedObjects.objectGroups) {
+                objectGroups = new ObjectGroups(appName, parsedObjects.objectGroups)
+            }
+            if (parsedObjects.links) {
+                links = new Links(appName, parsedObjects.links)
+            }
+            if (parsedObjects.jobs) {
+                jobs = new Jobs(appName, parsedObjects.jobs)
+            }
+            if (parsedObjects.sparkJobs) {
+                sparkJobs = new SparkJobs(appName, parsedObjects.sparkJobs)
+            }
+
+            log.info "loaded application: $this"
         } else {
-            log.debug "\t\tNo configsets in parsedObjects source (this is expected)"
+            log.warn "Could not parse app! Source: $source (no exportedObjectsSourceMap...?)"
         }
-        if (parsedObjects.collections) {
-            collections = new Collections(appName, (List) parsedObjects.collections)
-        }
-        if (parsedObjects.dataSources) {
-            dataSources = new DataSources(appName, parsedObjects.dataSources)
-        }
-        if (parsedObjects.indexPipelines) {
-            indexPipelines = new IndexPipelines(appName, parsedObjects.indexPipelines)
-        }
-        if (parsedObjects.indexProfiles) {
-            indexProfiles = new IndexProfiles(appName, parsedObjects.indexProfiles)
-        }
-        if (parsedObjects.queryPipelines) {
-            queryPipelines = new QueryPipelines(appName, parsedObjects.queryPipelines)
-        }
-        if (parsedObjects.queryProfiles) {
-            queryProfiles = new QueryProfiles(appName, parsedObjects.queryProfiles)
-        }
-        if (parsedObjects.parsers) {
-            parsers = new Parsers(appName, parsedObjects.parsers)
-        }
-        if (parsedObjects.blobs) {
-            blobs = new Blobs(appName, parsedObjects.blobs)
-        } else {
-            log.info "\t\tno blobs available (subset of appexport or pre F4...?)"
-        }
-        if (parsedObjects.appkitApps) {
-            appkitApps = new AppKits(appName, parsedObjects.appkitApps)
-        } else {
-            log.info "\t\tno Appkit apps found; this is fine--unless you have appkit apps...?"
-        }
-        if (parsedObjects.features) {
-            features = new Features(appName, parsedObjects.features)
-        }
-
-        if (parsedObjects.objectGroups) {
-            objectGroups = new ObjectGroups(appName, parsedObjects.objectGroups)
-        }
-        if (parsedObjects.links) {
-            links = new Links(appName, parsedObjects.links)
-        }
-        if (parsedObjects.jobs) {
-            jobs = new Jobs(appName, parsedObjects.jobs)
-        }
-        if (parsedObjects.sparkJobs) {
-            sparkJobs = new SparkJobs(appName, parsedObjects.sparkJobs)
-        }
-
-        log.info "loaded application: $this"
     }
 
     /**
@@ -154,7 +159,7 @@ class Application extends BaseObject {
         ZipEntry objectsJsonZipEntry = entries.find { it.name.equalsIgnoreCase('objects.json') }
         String objectsJson = extractZipEntryText(zipFile, objectsJsonZipEntry)
         JsonSlurper jsonSlurper = new JsonSlurper()
-        Map<String,Object> objectsMap  = jsonSlurper.parseText(objectsJson)
+        Map<String, Object> objectsMap = jsonSlurper.parseText(objectsJson)
         log.info "Got Map from objects json in zip: $sourceZip"
         return objectsMap
     }
@@ -183,7 +188,7 @@ class Application extends BaseObject {
     public Map<String, Object> parseAppMetadata(Map<String, Object> parsedMap) {
         Map parsedMetadata = [:]
         Map objects
-        if (parsedMap.objects) {
+        if (parsedMap?.objects) {
             log.info "\t\tGot full source map ${parsedMap.keySet()} "
             objects = parsedMap.objects
             appProperties = parsedMap.properties
@@ -223,7 +228,11 @@ class Application extends BaseObject {
 
             parsedMetadata.metadata = metadata
         } else {
-            log.info "\t\tGot some unxpected source map ${parsedMap.keySet()}, hoping we were called with [objects.json].objects (subset)...? won't have full metadata "
+            if (parsedMap) {
+                log.warn "\t\tGot some unxpected source map ${parsedMap.keySet()}, hoping we were called with [objects.json].objects (subset)...? won't have full metadata "
+            } else {
+                log.warn "\t\tGot some unxpected source map NO PARSED MAP, nothing to do for ${this.source}"
+            }
             objects = parsedMap
         }
 
@@ -242,8 +251,9 @@ class Application extends BaseObject {
         return things
     }
 
-    Map<String, Object> parseSourceFile(File appOrJson) {
-        Map parsed = null
+//    Map<String, Object> parseSourceFile(File appOrJson) {
+    void parseSourceFile(File appOrJson) {
+//        Map parsed = null
         Map<String, Object> configsets = [:]
         if (appOrJson?.exists()) {
 //            objectsJson = null      //todo - remove?
@@ -266,73 +276,77 @@ class Application extends BaseObject {
         }
         if (configsets) {
             log.debug "\t\tadding configsets: ${configsets.keySet()}"
-            parsed.configsets = configsets
+//            parsed.configsets = configsets
         }
-        log.debug "Parsed Map: $parsed"
-        return parsed
+//        log.debug "Parsed Map: $parsed"
+//        return parsed
     }
 
     public void loadFromAppExportArchive(File appExportZipFile) {
         log.info "\t\tLoad app from export ZIP archive: ${appExportZipFile.absolutePath} ..."
         source = appExportZipFile
-        ZipFile zipFile = new ZipFile(appExportZipFile)
-        Enumeration<? extends ZipEntry> entries = zipFile.entries()
-        Map<String, String> cfgSets = [:]
-        int LOG_BATCH_SIZE = 500
-        int counter = 0
-        JsonSlurper jsonSlurper = new JsonSlurper()
-        entries.each { ZipEntry zipEntry ->
-            counter++
-            if (counter % LOG_BATCH_SIZE == 0) {
-                log.info "\t\t$counter) progress update... working through zipEntry: $zipEntry"
-            }
-
-            if (zipEntry.name.contains('objects.json')) {
-                String objectsJson = extractZipEntryText(zipFile, zipEntry)
-                exportedObjectsSourceMap = jsonSlurper.parseText(objectsJson)
-                log.debug "\t\textracted json text from zip entry: ${((Map) exportedObjectsSourceMap).keySet()}"
-            } else if (zipEntry.name.contains('configsets')) {
-                String name = zipEntry.name
-                String content = extractZipEntryText(zipFile, zipEntry)
-                cfgSets[name] = content
-                log.debug "Configset: $zipEntry"
-
-            } else if (zipEntry.name.startsWith('blobs')) {
-                String name = zipEntry.name
-                // todo -- write code to get/store blob object intelligently
-                log.debug "\t\t$name) zipEntry "
-//                String content = extractZipEntryText(zipFile, zipEntry)
-                blobObjects << zipEntry
-                log.debug "\t\tBlob object: $zipEntry"
-
-            } else if (zipEntry.name.startsWith('query_rewrite')) {
-                String name = zipEntry.name
-                String content = extractZipEntryText(zipFile, zipEntry)
-                queryRewriteJson[name] = content
-                queryRewriteRules[name] = jsonSlurper.parseText(content)
-                log.info "\t\tQuery Rewrite rules count: ${queryRewriteRules.size()} from zip entry: $zipEntry"
-
-            } else {
-                String name = zipEntry.name
-                if (name.endsWith('/')) {
-                    log.info "Skip zip file folder: $name"
-                } else {
-                    // todo -- add logic to handle non-text blobs...
-                    String content = extractZipEntryText(zipFile, zipEntry)
-                    unknownItems[name] = content
-                    log.warn "Storing UNKNOWN zip entry: ${zipEntry} (in application.unknownItems map) -- is this a problem? anything valuable we should be processing?"
+        try {
+            ZipFile zipFile = new ZipFile(appExportZipFile)
+            Enumeration<? extends ZipEntry> entries = zipFile.entries()
+            Map<String, String> cfgSets = [:]
+            int LOG_BATCH_SIZE = 500
+            int counter = 0
+            JsonSlurper jsonSlurper = new JsonSlurper()
+            entries.each { ZipEntry zipEntry ->
+                counter++
+                if (counter % LOG_BATCH_SIZE == 0) {
+                    log.info "\t\t$counter) progress update... working through zipEntry: $zipEntry"
                 }
-            }
-            log.debug "ZipEntry: $zipEntry"
-        }
-        Map parsedMetadata = parseAppMetadata(exportedObjectsSourceMap)
-        log.debug "\t\tParsed app metadata: ${parsedMetadata.keySet()}"
 
-        if (cfgSets) {
-            configsets = new ConfigSetCollection(cfgSets, this.appName)
-            log.debug "configsets: $configsets"
+                if (zipEntry.name.contains('objects.json')) {
+                    String objectsJson = extractZipEntryText(zipFile, zipEntry)
+                    exportedObjectsSourceMap = jsonSlurper.parseText(objectsJson)
+                    log.debug "\t\textracted json text from zip entry: ${((Map) exportedObjectsSourceMap).keySet()}"
+                } else if (zipEntry.name.contains('configsets')) {
+                    String name = zipEntry.name
+                    String content = extractZipEntryText(zipFile, zipEntry)
+                    cfgSets[name] = content
+                    log.debug "Configset: $zipEntry"
+
+                } else if (zipEntry.name.startsWith('blobs')) {
+                    String name = zipEntry.name
+                    // todo -- write code to get/store blob object intelligently
+                    log.debug "\t\t$name) zipEntry "
+//                String content = extractZipEntryText(zipFile, zipEntry)
+                    blobObjects << zipEntry
+                    log.debug "\t\tBlob object: $zipEntry"
+
+                } else if (zipEntry.name.startsWith('query_rewrite')) {
+                    String name = zipEntry.name
+                    String content = extractZipEntryText(zipFile, zipEntry)
+                    queryRewriteJson[name] = content
+                    queryRewriteRules[name] = jsonSlurper.parseText(content)
+                    log.info "\t\tQuery Rewrite rules count: ${queryRewriteRules.size()} from zip entry: $zipEntry"
+
+                } else {
+                    String name = zipEntry.name
+                    if (name.endsWith('/')) {
+                        log.info "Skip zip file folder: $name"
+                    } else {
+                        // todo -- add logic to handle non-text blobs...
+                        String content = extractZipEntryText(zipFile, zipEntry)
+                        unknownItems[name] = content
+                        log.warn "Storing UNKNOWN zip entry: ${zipEntry} (in application.unknownItems map) -- is this a problem? anything valuable we should be processing?"
+                    }
+                }
+                log.debug "ZipEntry: $zipEntry"
+            }
+            Map parsedMetadata = parseAppMetadata(exportedObjectsSourceMap)
+            log.debug "\t\tParsed app metadata: ${parsedMetadata.keySet()}"
+
+            if (cfgSets) {
+                configsets = new ConfigSetCollection(cfgSets, this.appName)
+                log.debug "configsets: $configsets"
+            }
+            log.info "\t\tConfig sets (${configsets?.toString()}) and parsed Map keyset: (${exportedObjectsSourceMap?.keySet()})"
+        } catch(ZipException ze) {
+            log.warn "Zip file error: $ze"
         }
-        log.info "\t\tConfig sets (${configsets.toString()}) and parsed Map keyset: (${exportedObjectsSourceMap.keySet()})"
     }
 
     public Object loadFromObjectsJsonFile(File jsonSourceFile) {
@@ -351,7 +365,7 @@ class Application extends BaseObject {
      * @param zipEntry
      * @return
      */
-    static  public String extractZipEntryText(ZipFile zipFile, ZipEntry zipEntry) {
+    static public String extractZipEntryText(ZipFile zipFile, ZipEntry zipEntry) {
         String jsonString
         InputStream inputStream = zipFile.getInputStream(zipEntry)
         BufferedReader br = new BufferedReader(new InputStreamReader(inputStream, "UTF-8"));
