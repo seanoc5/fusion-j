@@ -3,15 +3,13 @@ package com.lucidworks.ps.clients
 import spock.lang.Specification
 
 import java.net.http.HttpRequest
-import java.net.http.HttpResponse
-
 /**
  * Testing fusion client
  * Note: this should be a functional test, not a unit test, refactor as appropriate...
  */
 class FusionClientTest extends Specification {
     String appName= 'test'
-    String furl = 'http://newmac:8764/'
+    String furl = 'http://newmac:8764'
     FusionClient client = new FusionClient(furl, 'sean', 'pass1234', appName)
 
     def "test buildClient"() {
@@ -22,6 +20,7 @@ class FusionClientTest extends Specification {
 
         then:
         apiInfo instanceof Map
+        client.majorVersion >=4
     }
 
     def "test buildGetRequest"() {
@@ -33,6 +32,7 @@ class FusionClientTest extends Specification {
 
         then:
         request instanceof HttpRequest
+        request.uri().toString() == url
     }
 
     def "test getApplications"() {
@@ -85,9 +85,13 @@ class FusionClientTest extends Specification {
         Map qryParams = [q:q]
 
         when:
-        def results = client.query(appName, collName, qrypName, qryParams, )
+        FusionResponseWrapper fwr = client.query(appName, collName, qrypName, qryParams, )
+        Map info = fwr.parsedInfo
+        Map response = info.response
+
         then:
-        results instanceof HttpResponse<String>
+        fwr.wasSuccess()
+        response.keySet().contains('numFound')
 
     }
 }
