@@ -369,6 +369,7 @@ class FusionClient {
         JsonSlurper jsonSlurper = new JsonSlurper()
         HttpRequest request = buildGetRequest(url)
 
+        // todo -- refactor to call client.send()
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
         int rc = response.statusCode()
         if (rc >= 200 && rc < 300) {
@@ -376,10 +377,13 @@ class FusionClient {
             apiInfo = jsonSlurper.parseText(response.body())
             log.debug "Fusion API info: $apiInfo"
             versionString = apiInfo.version
-            if(versionString) {
-                if (versionString == 'localhost') {
+            if (versionString) {
+                if (versionString == 'local') {
                     log.warn "\t\tVersion (${versionString}) unclear, assuming 4.x..."
-                    majorVersion = 4
+                    // todo -- refactor...? leaving as a process, rather than a more functional programming (more proper) style...
+                    getApolloConfigurations()
+                    log.debug "Major version: ${majorVersion}"
+//                    majorVersion = 4
                 } else if (versionString.startsWith('5')) {
                     majorVersion = 5
                     log.info "Found version string: '${versionString}' which looks like major version (${majorVersion})"
@@ -391,6 +395,7 @@ class FusionClient {
             log.warn "Could not get valid API information: ${this.fusionBase}"
         }
 
+        // todo refactor to separate call
         URI uri = (URI.create("${this.fusionBase}/api/introspect"))
         var reqIntro = HttpRequest.newBuilder()
                 .GET()
@@ -415,12 +420,29 @@ class FusionClient {
 
 
     /**
+     * fallback for Fusion 4 (localhost?) call to get version info...?
+     */
+    def getApolloConfigurations() {
+        String urlBase = 'api/apollo/configurations'
+        String url = "$fusionBase/${urlBase}"
+        HttpRequest request = buildGetRequest(url)
+        FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
+        HttpResponse response = fusionResponseWrapper.response
+        if (fusionResponseWrapper.wasSuccess()) {
+            Map info = fusionResponseWrapper.parsedInfo
+            log.info "Fall-back call to url base: ${urlBase} to get version information:${info.keySet()}"
+            versionString = info['app.version']
+            majorVersion = getFusionMajorVersion(versionString)
+        }
+    }
+
+    /**
      * get fusion version, likely part of setting the rest api structure in future calls
      */
-//    def getFusionVersion() {
-//        // todo :: figure out what is a good way to get relevant version info, the calls in getFusionVersion don't have what I expect (version is 'local' for localhost 4.2.6)
-//        return "more to come RSN..."
-//    }
+/*    def getFusionVersion() {
+        // todo :: figure out what is a good way to get relevant version info, the calls in getFusionVersion don't have what I expect (version is 'local' for localhost 4.2.6)
+        return "more to come RSN..."
+    }*/
 
     /**
      * placeholder function to check for session validity (i.e. expired cookie?)
@@ -456,22 +478,20 @@ class FusionClient {
 //        URI uri = URI.create("${this.fusionBase}/api/apps/${app}/query-pipelines/${queryPipeline}/collections/${collection}/${reqHandler}")
         qparams.each { String name, def val ->
             log.debug "\t\t Adding param: $name => $val"
-            uriaddParameter(name, "${val}")         // needs to be a string?
+            ub.addParameter(name, "${val}")         // needs to be a string?
         }
+//        ub.addParameters(qparams)
         URI uri = URI.create(ub.toString())
         log.info "\t\tprepared uri: $uri"
 
-        HttpRequest request = buildGetRequest(url)
-
-        HttpResponse<String> queryResponse = null
-        try {
-            // todo -- any difference if we do not use String type/generic?
-            queryResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-            log.info "Query response: $queryResponse"
-        } catch (ConnectException ce) {
-            log.info "Connection error...? $ce"
+        // todo -- refactor buildGetRequest to accept uri?
+        HttpRequest request = buildGetRequest(uri.toString())
+        FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
+        if(fusionResponseWrapper.wasSuccess()) {
+            def info = fusionResponseWrapper.parsedInfo
+            log.info "\t\tNum found: ${info.response?.numFound}"
         }
-        return queryResponse
+        return fusionResponseWrapper
     }
 
 
@@ -1753,5 +1773,27 @@ class FusionClient {
         HttpRequest request = buildGetRequest(url)
         FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
         return fusionResponseWrapper
+    }
+
+    String getFusionVersion() {
+        if (versionString) {
+            return versionString
+        } else {
+
+        }
+    }
+
+    int getFusionMajorVersion(String ver) {
+        Integer majorVersion
+        if (ver) {
+            String firstChar = ver[0]
+            if (firstChar.isInteger()) {
+                majorVersion = new Integer(firstChar)
+            } else {
+                log.warn "Could not determine fusion major version from version string: '$ver'... setting to '-1'"
+                majorVersion = -1
+            }
+            return majorVersion
+        }
     }
 }
