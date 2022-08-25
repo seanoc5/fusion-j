@@ -18,7 +18,7 @@ class ExportedAppArgParser {
             c longOpt: "config", argName: 'configFile', 'Configuration file to load with Groovy ConfigSlurper: http://docs.groovy-lang.org/next/html/gapi/groovy/util/ConfigSlurper.html'
             l longOpt: 'flat', required: false, argName: 'flatOutput', 'Export files in a flat/ungrouped format, otherwise the default is to group by object type'
             s longOpt: 'source', args: 1, required: true, argName: 'sourceFile', 'Source (objects.json or appexport.zip) to read application objects from (old app to be migrated)'
-            x longOpt: 'exportDir', args: 1, required: false, argName: 'dir', 'Export directory'
+            x longOpt: 'exportDir', args: 1, required: true, argName: 'dir', 'Export directory'
         }
 
 
