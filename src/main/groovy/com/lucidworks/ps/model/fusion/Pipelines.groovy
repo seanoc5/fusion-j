@@ -12,28 +12,32 @@ import org.apache.log4j.Logger
  */
 class Pipelines extends BaseObject {
     static Logger log = Logger.getLogger(this.class.name);
+    /** map of the source objects (pipeline jsonobjects), converted from list to map (id as key)  */
+    Map<String, List<PipelineStages>> pipelines = [:]
+
     /** map of stages grouped by pipeline id/key */
     Map<String, List<PipelineStages>> pipelineStagesMap = [:]
-    /** map of javascript stages grouped by pipeline id/key -- helpful in export and assessement */
+    /** map of javascript ALL pipeline stages grouped by pipeline id/key -- helpful in export and assessement */
     Map<String, List<Javascript>> javascriptStages = [:]
-//    String type = 'unknown'
 
-    Pipelines(String applicationName, List<Map<String, Object>> items) {
-        super(applicationName, items)
-//        itemType = this.getClass().simpleName
-        items.each { Map pipelineJsonMap ->
+    Pipelines(String applicationName, List<Map<String, Object>> pipelineJsonObjects) {
+        super(applicationName, pipelineJsonObjects)
+        pipelineJsonObjects.each { Map pipelineJsonMap ->
             String pipelineID = pipelineJsonMap.id
+            // todo --refactor, this is redundant, and a temp hack as I work through exporting/evaluating javascript en-mass...
+            pipelines[pipelineID] = pipelineJsonMap
+
             if (pipelineJsonMap.stages) {
-                pipelineStagesMap[pipelineID] = pipelineJsonMap.stages
                 List<Javascript> jsStages = []
                 pipelineJsonMap.stages.each {
                     String stageId = it.id
+                    pipelineStagesMap["${pipelineID}-${stageId}"] = it
                     String type = it.type
                     if (type.containsIgnoreCase('javascript')) {
-                        String label = "$applicationName :: $pipelineID :: $stageId :: $type"
+                        String label = "$applicationName.$pipelineID.$stageId.$type"
                         String script = it.script?.trim()
                         if (script) {
-                            Javascript js = new Javascript(label, script)
+                            Javascript js = new Javascript(label, script, this.itemType)
                             jsStages << js
                         } else {
                             log.warn "Problem finding script in JS stage ($label)...?"
