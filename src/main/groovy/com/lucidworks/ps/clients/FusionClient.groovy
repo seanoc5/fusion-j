@@ -1041,6 +1041,21 @@ class FusionClient {
 
         return responseWrapper.parsedInfo
     }
+    Object getQueryPipeline(String app, String qryPipelineId) {
+        HttpResponse<String> response = null
+        String url = null
+        if (app) {
+            url = "$fusionBase/api/apps/${app}/query-pipelines/$qryPipelineId"
+        } else {
+            url = "$fusionBase/api/query-pipelines/$qryPipelineId"
+            log.info "No app given, getting all query pipelines..."
+        }
+        log.info "\t list query pipelines for url: $url "
+        HttpRequest request = buildGetRequest(url)
+        FusionResponseWrapper responseWrapper = sendFusionRequest(request)
+
+        return responseWrapper
+    }
 
     /**
      * create and index pipeline by converting map object to json payload including destination application to connect it to
