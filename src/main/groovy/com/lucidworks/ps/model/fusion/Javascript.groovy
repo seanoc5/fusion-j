@@ -161,14 +161,16 @@ class Javascript extends BaseObject {
         sid.addField('script_txt', script)
         sid.addField('sourceType_s', sourceType)
         sid.addField('jslines_txt', lines)
+        sid.addField('lineCount_i', lines.size())
 
         if (!groupedLines) {
             groupedLines = groupLines()
             log.debug "Grouped lines: $groupedLines"
         }
-        groupedLines.each { String group, List<String> lines ->
-            log.debug "\t\t add groupded lines ($group) with ${lines.size()} lines"
-            sid.addField("jsTag-${group}_txt", lines)
+        groupedLines.each { String group, List<String> groupLines ->
+            log.debug "\t\t add groupded lines ($group) with ${groupLines.size()} lines"
+            sid.addField("jsTag-${group}_txt", groupLines)
+            sid.addField("count-${group}_i", groupLines.size())
         }
         sid.addField('tag_ss', groupedLines.keySet())
         return sid
