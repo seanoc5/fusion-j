@@ -54,7 +54,8 @@ Path tempPath = Paths.get("tempfile.zip")
 HttpResponse.BodyHandler bodyHandler = HttpResponse.BodyHandlers.ofFile(tempPath)
 log.info "\t\tusing temp file: ${tempPath.toAbsolutePath()}"
 
-def objects = fusionClient.getObjects("", bodyHandler)
 def configSets = fusionClient.getConfigSets()
-
 log.info "ConfigSets: $configSets"
+
+log.info "Get Objects"
+def objects = fusionClient.getObjects("", bodyHandler)
