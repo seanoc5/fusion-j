@@ -814,18 +814,22 @@ class FusionClient {
      * @param outputPath
      * @return
      */
-    HttpResponse<Path> exportFusionObjects(String exportParams, Path outputPath) {
+    def exportFusionObjects(String exportParams, Path outputPath, def bodyHandler = HttpResponse.BodyHandlers.ofInputStream()) {
+//    HttpResponse<Path> exportFusionObjects(String exportParams, Path outputPath) {
         String url = "$fusionBase/api/objects/export?${exportParams}"
         log.info "\t\tExport Fusion objects url: $url"
         HttpRequest request = buildGetRequest(url)
+//        FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
 
         HttpResponse<Path> fileResponse = null
         try {
-            fileResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofFile(outputPath))
+            fileResponse = httpClient.send(request, bodyHandler)
 
             int statusCode = fileResponse.statusCode()
             if (isSuccessResponse(fileResponse)) {
-                log.info "\t\tOutput file: ${fileResponse} --> ${outputPath.toAbsolutePath()} \t response: ${fileResponse.statusCode()}"
+                log.info "\t\tOutput file: ${fileResponse} --> ${outputPath.toAbsolutePath()} \t response: ${fileResponse.statusCode()} -- Response type: ${fileResponse.getClass().name}"
+//                Path downloadedFile = fileResponse.body();
+//                log.debug "Response type: ${fileResponse.getClass().name}"
             } else {
                 log.warn "Response shows unsuccessful? Status code: $statusCode -- $fileResponse"
             }
@@ -1611,7 +1615,7 @@ class FusionClient {
      * Get the 'tree' from solr/zk for things like solrconfig, stopwords, managed-schema
      * @return
      */
-    def getConfigSets() {
+    def getConfigSets(List<String> configsetsToGet = []) {
         String url = "$fusionBase/api/solrAdmin/default/admin/configs?action=LIST"
         // {{furl}}/api/solrAdmin/default/admin/configs?action=LIST
         HttpRequest request = buildGetRequest(url)
@@ -1630,6 +1634,11 @@ class FusionClient {
         // todo -- consider refactoring to return FusionResponseWrapper like other calls...
     }
 
+    /**
+     * get a specific solr configset
+     * todo -- implemeent call to get the one
+     * @return
+     */
     def getConfigSet() {
         String url = "$fusionBase/api/solrAdmin/default/admin/configs?action=LIST&recursive=true"
         // {{furl}}/api/solrAdmin/default/admin/configs?action=LIST
