@@ -1,13 +1,11 @@
 package com.lucidworks.ps.clients
 
-import org.apache.commons.compress.archivers.zip.ZipArchiveInputStream
+import org.apache.commons.compress.archivers.zip.ZipFile
 import spock.lang.Specification
 
 import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 import java.nio.file.Path
 import java.nio.file.Paths
-
 /**
  * Testing fusion client
  * Note: this should be a functional test, not a unit test, refactor as appropriate...
@@ -100,6 +98,7 @@ class FusionClientTest extends Specification {
 
     }
 
+/*
     def "get configset map response- test"() {
         given:
         List<String> configsetsToGet = ['upval', 'Keymatches']
@@ -116,39 +115,48 @@ class FusionClientTest extends Specification {
 //        response.keySet().contains('numFound')
 
     }
+*/
 
+/*
     def "export objects ofFile response - collection test"() {
         given:
         List<String> collectionToGet = ['upval', 'Keymatches']
-        String exportParams= 'collection.ids=test'
+        String exportParams = 'collection.ids=test'
         Path exportFolder = Paths.get(getClass().getResource('/').toURI())
         Path exportZip = Paths.get(exportFolder.toAbsolutePath().toString(), 'collection.test.zip')
 
         when:
-        def results = client.exportFusionObjects(exportParams, exportZip)
+        FusionResponseWrapper fusionResponseWrapper = client.exportFusionObjects(exportParams, exportZip)
+        def results = fusionResponseWrapper.parsedInfo
+        Map map = fusionResponseWrapper.parsedMap
+        Map list = fusionResponseWrapper.parsedList
+
 
         then:
-        results instanceof Map
+        map instanceof Map
+        map.size() > 0
+        map['objects.json']
 
     }
+*/
+
     def "export objects inputstream response - collection test"() {
         given:
         List<String> collectionToGet = ['upval', 'Keymatches']
-        String exportParams= 'collection.ids=test'
+        String exportParams = 'collection.ids=test'
         Path exportFolder = Paths.get(getClass().getResource('/').toURI())
         Path exportZip = Paths.get(exportFolder.toAbsolutePath().toString(), 'collection.test.zip')
 
         when:
-        HttpResponse results = client.exportFusionObjects(exportParams, exportZip)
-        println("Results class type: ${results.getClass().name}")
-//        InputStream bis = results.body()
-        ZipArchiveInputStream zais = results.body()
+        FusionResponseWrapper fusionResponseWrapper = client.exportFusionObjects(exportParams)
+        def results = fusionResponseWrapper.parsedInfo
+        Map map = fusionResponseWrapper.parsedMap
+        List list = fusionResponseWrapper.parsedList
+
 
         then:
-        results instanceof HttpResponse
-        zais.canReadEntryData()
-        zais.compressedCount > 0
-//        results instanceof Map
-
+        map instanceof Map
+        map.size() > 0
+        map['objects.json'] instanceof ZipFile.Entry
     }
 }

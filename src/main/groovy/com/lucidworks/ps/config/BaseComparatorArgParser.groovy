@@ -1,4 +1,4 @@
-package com.lucidworks.ps.clients
+package com.lucidworks.ps.config
 
 import groovy.cli.picocli.CliBuilder
 import groovy.cli.picocli.OptionAccessor

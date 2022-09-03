@@ -96,12 +96,17 @@ class FusionClient {
      * @param options
      */
     FusionClient(OptionAccessor options) {
-        if (options.f.endsWith('/')) {
-            fusionBase = options.f[0..-2]
-            log.info "Remove trailing slash from options.f (fusionBase: ${options.f}) -> $fusionBase"
+        String fbase = options.hasOption('fusionUrl') ? options.fusionUrl : null
+        if (fbase) {
+            if (fbase.endsWith('/')) {
+                fusionBase = fbase[0..-2]
+                log.info "Remove trailing slash from options.f (fusionBase: ${fbase}) -> $fusionBase"
+            } else {
+                fusionBase = fbase
+                log.debug "Standard fusion base: $fusionBase"
+            }
         } else {
-            fusionBase = options.f
-            log.debug "Standard fusion base: $fusionBase"
+            log.info "No fusion base given in options, assuming config file will have it if needed...?"
         }
         user = options.u                            // fusion username for destination of new/migrated app
         password = options.p
@@ -123,7 +128,7 @@ class FusionClient {
                 throw new IllegalArgumentException("Missing source file, param: $srcObjectJsonPath, but not a readable file (${srcFile.absolutePath})")
             }
         } else {
-            log.debug "No source file arg given (not reading app export, nor objects.json)... "
+            log.info "No source file arg given (not reading app export, nor objects.json)... "
         }
 
         // some optional label to group things by (client name, or app name)
@@ -156,7 +161,7 @@ class FusionClient {
      * @return
      */
     HttpClient buildClient(String baseUrl, String user, String pass) {
-        log.info "\t${this.class.simpleName} getClient(baseurl: $baseUrl, user:$user, password <hidden>...)   [should only need to call this once...]"
+        log.info "\t\t${this.class.simpleName} getClient(baseurl: $baseUrl, user:$user, password <hidden>...)   [should only need to call this once...]"
         HttpClient client = HttpClient.newBuilder()
                 .cookieHandler(new CookieManager())
                 .version(HttpClient.Version.HTTP_1_1)
@@ -386,7 +391,7 @@ class FusionClient {
 //                    majorVersion = 4
                 } else if (versionString.startsWith('5')) {
                     majorVersion = 5
-                    log.info "Found version string: '${versionString}' which looks like major version (${majorVersion})"
+                    log.info "\t\tFound version string: '${versionString}' which looks like major version (${majorVersion})"
                 }
             } else {
                 log.warn "No version entry found from API call... WTH...? what version is this...? API info returned: \n$apiInfo"
@@ -408,10 +413,9 @@ class FusionClient {
         HttpResponse<String> respIntro = httpClient.send(reqIntro, HttpResponse.BodyHandlers.ofString())
         rc = respIntro.statusCode()
         if (rc >= 200 && rc < 300) {
-
-            log.info("Response introspection result code: ${respIntro.statusCode()}")
+            log.info("\t\tResponse introspection result code: ${respIntro.statusCode()}")
             introspectInfo = jsonSlurper.parseText(respIntro.body())
-            log.info "\tFusion Introspection info (keys only): ${introspectInfo.keySet()}"
+            log.info "\t\tFusion Introspection info (keys only): ${introspectInfo.keySet()}"
         } else {
             log.warn "Could not get valid Introspection information: ${this.fusionBase}"
         }
@@ -487,7 +491,7 @@ class FusionClient {
         // todo -- refactor buildGetRequest to accept uri?
         HttpRequest request = buildGetRequest(uri.toString())
         FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
-        if(fusionResponseWrapper.wasSuccess()) {
+        if (fusionResponseWrapper.wasSuccess()) {
             def info = fusionResponseWrapper.parsedInfo
             log.info "\t\tNum found: ${info.response?.numFound}"
         }
@@ -811,32 +815,17 @@ class FusionClient {
      * call fusion rest api to get all the objects defined in fusion
      *
      * @param exportParams
-     * @param outputPath
+     * @param bodyHandler how to retrieve response body -- typically stream hanlder
      * @return
      */
-    def exportFusionObjects(String exportParams, Path outputPath, def bodyHandler = HttpResponse.BodyHandlers.ofInputStream()) {
+    FusionResponseWrapper exportFusionObjects(String exportParams, def bodyHandler = HttpResponse.BodyHandlers.ofInputStream()) {
 //    HttpResponse<Path> exportFusionObjects(String exportParams, Path outputPath) {
         String url = "$fusionBase/api/objects/export?${exportParams}"
         log.info "\t\tExport Fusion objects url: $url"
         HttpRequest request = buildGetRequest(url)
-//        FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
+        FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request, bodyHandler)
 
-        HttpResponse<Path> fileResponse = null
-        try {
-            fileResponse = httpClient.send(request, bodyHandler)
-
-            int statusCode = fileResponse.statusCode()
-            if (isSuccessResponse(fileResponse)) {
-                log.info "\t\tOutput file: ${fileResponse} --> ${outputPath.toAbsolutePath()} \t response: ${fileResponse.statusCode()} -- Response type: ${fileResponse.getClass().name}"
-//                Path downloadedFile = fileResponse.body();
-//                log.debug "Response type: ${fileResponse.getClass().name}"
-            } else {
-                log.warn "Response shows unsuccessful? Status code: $statusCode -- $fileResponse"
-            }
-        } catch (Exception e) {
-            log.error "Export exception: $e"
-        }
-        return fileResponse
+        return fusionResponseWrapper
     }
 
 
@@ -1045,6 +1034,7 @@ class FusionClient {
 
         return responseWrapper.parsedInfo
     }
+
     Object getQueryPipeline(String app, String qryPipelineId) {
         HttpResponse<String> response = null
         String url = null
@@ -1615,6 +1605,7 @@ class FusionClient {
      * Get the 'tree' from solr/zk for things like solrconfig, stopwords, managed-schema
      * @return
      */
+/*
     def getConfigSets(List<String> configsetsToGet = []) {
         String url = "$fusionBase/api/solrAdmin/default/admin/configs?action=LIST"
         // {{furl}}/api/solrAdmin/default/admin/configs?action=LIST
@@ -1633,12 +1624,14 @@ class FusionClient {
         return fusionResponseWrapper.parsedMap.configSets
         // todo -- consider refactoring to return FusionResponseWrapper like other calls...
     }
+*/
 
     /**
      * get a specific solr configset
      * todo -- implemeent call to get the one
      * @return
      */
+/*
     def getConfigSet() {
         String url = "$fusionBase/api/solrAdmin/default/admin/configs?action=LIST&recursive=true"
         // {{furl}}/api/solrAdmin/default/admin/configs?action=LIST
@@ -1656,6 +1649,7 @@ class FusionClient {
         }
         return fusionResponseWrapper
     }
+*/
 
 
     /**

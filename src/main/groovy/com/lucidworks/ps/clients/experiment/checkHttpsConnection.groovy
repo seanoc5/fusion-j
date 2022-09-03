@@ -1,3 +1,5 @@
+package com.lucidworks.ps.clients.experiment
+
 import com.lucidworks.ps.clients.FusionClient
 import groovy.cli.picocli.CliBuilder
 import groovy.cli.picocli.OptionAccessor

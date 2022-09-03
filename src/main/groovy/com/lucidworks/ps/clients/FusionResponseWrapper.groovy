@@ -1,6 +1,10 @@
 package com.lucidworks.ps.clients
 
 import groovy.json.JsonSlurper
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry
+import org.apache.commons.compress.archivers.zip.ZipFile
+import org.apache.commons.compress.utils.SeekableInMemoryByteChannel
+import org.apache.commons.io.IOUtils
 import org.apache.groovy.json.internal.LazyMap
 import org.apache.log4j.Logger
 
@@ -52,54 +56,76 @@ class FusionResponseWrapper {
         this.response = fusionResponse
 
         if (wasSuccess()) {
-            log.debug "Successfull call:$origRequest -- response:$response"
-            this.responseText = response.body()
-            if (this.responseText) {
-                JsonSlurper jsonSlurper = new JsonSlurper()
-                def obj = jsonSlurper.parseText(this.responseText)
-                try {
-                    if (obj instanceof List) {
-                        parsedList = obj
-                        log.debug "\t\tGot back a list for request: $origRequest"
-                    } else if (obj instanceof Map) {
-                        parsedMap = obj
-                        log.debug "\t\tGot back a Map for request: $origRequest"
+            log.debug "Successfull call:$origRequest -- response:$response "
+            def body = response.body()
+            if (body) {
+                String bodyType = body.getClass().name
+                log.debug "Body class: ${bodyType}"
+
+                if (body instanceof String) {
+                    this.responseText = response.body()
+                    if (isJson(body)) {
+                        log.debug "Response body starts with what looks like json '{' so parse as json (not xml)"
+                        def obj = new JsonSlurper().parseText(body)
+
+                        try {
+                            if (obj instanceof List) {
+                                parsedList = obj
+                                log.debug "\t\tGot back a list for request: $origRequest"
+                            } else if (obj instanceof Map) {
+                                parsedMap = obj
+                                log.debug "\t\tGot back a Map for request: $origRequest"
+                            }
+                            parsedInfo = obj
+                        } catch (Exception e) {
+                            log.warn "Bad groovy-ness?? Map vs List vs 'def' issues?? error: $e"
+                        }
+//                            log.debug "Error msg (json->map): $json"
+
+
+                    } else if (responseText.startsWith('<')) {
+                        log.warn "Looks like an xml response?!? MORE CODE here"
                     }
-                    parsedInfo = obj
-                } catch (Exception e) {
-                    log.warn "Bad groovy-ness?? Map vs List vs 'def' issues?? error: $e"
+                } else if (bodyType.containsIgnoreCase('file')) {
+                    log.warn "Processing FILE response.... MORE CODE HERE"
+
+                } else if (bodyType.containsIgnoreCase('stream')) {
+                    // todo add code for OTHER streams, or files that are not zipfiles
+                    ZipFile zipFile
+                    try {
+                        log.warn "Processing stream response.... MORE CODE HERE (i.e. non-zipfile requests...)"
+                        InputStream stream = body
+                        SeekableInMemoryByteChannel channel = new SeekableInMemoryByteChannel(IOUtils.toByteArray(stream));
+                        zipFile = new ZipFile(channel)
+                        Enumeration<ZipArchiveEntry> entries = zipFile.getEntries()
+                        parsedList = Collections.list(entries)
+                        parsedMap = parsedList.collectEntries { [it.name, it] }
+                        parsedInfo = entries
+                    } finally {
+                        if (zipFile) {
+                            zipFile.close()
+                        }
+                    }
                 }
-                log.debug "parsed..."
+
             } else {
-                String url = origRequest.uri().toString()
-                if (url.containsIgnoreCase('api/session')) {
+                String uri = origRequest.uri().toString()
+                if (uri.containsIgnoreCase('api/session')) {
                     log.debug "No response text for session"
+
                 } else {
-                    log.info "\t\tNo response text??? $fusionResponse"
+                    log.warn "\t\tNo body ($body) returned!!!?!"
                 }
             }
         } else {
-            def body = response?.body()
-            if (body instanceof String) {
-                responseText = body
-                if (body.startsWith('{')) {
-                    Map<String, Object> json = new JsonSlurper().parseText(body)
-                    if (json.type == 'RESTError') {
-                        log.warn "Call url (${origRequest.toString()}) failed: ${json.message} -- ${json.details}"
-                    } else {
-                        log.warn "Unknown request error: $json"
-                    }
-                    log.debug "Error msg (json->map): $json"
-                } else {
-                    log.warn "Unknown response format (not json??). Response body: $body"
-                }
-            } else {
-                log.warn("Response not a string??) Status: ${response.statusCode()} -- Not a successful request ($origRequest) -> response:($response)??  --body: ${response?.body()}")
-            }
+            log.warn("Request filed??) Status: ${response.statusCode()} -- Not a successful request ($origRequest) -> response:($response)??  --body: ${response?.body()}")
         }
-
     }
 
+/**
+ * helper wrapper method to process sucess/failure
+ * @return
+ */
     boolean wasSuccess() {
         if (origRequest && response) {
             if (response.statusCode() >= 200 && response.statusCode() < 300) {
@@ -109,15 +135,15 @@ class FusionResponseWrapper {
         return false
     }
 
-    /**
-     * create short descriptive text for req/resp etc
-     * @return
-     */
+/**
+ * create short descriptive text for req/resp etc
+ * @return
+ */
     String toString() {
         String verb = origRequest.method()
         String infoType = parsedInfo instanceof LazyMap ? "LazyMap" : parsedInfo?.class?.name
         String preview = null
-        if(parsedList) {
+        if (parsedList) {
             int previewItemCount = Math.min(2, parsedList.size())
             StringBuilder sb = new StringBuilder()
             def snippets = parsedList[0..previewItemCount].collect {
@@ -125,16 +151,17 @@ class FusionResponseWrapper {
                 s[0..Math.min(15, s.size())]
             }
             preview = "List(${parsedList.size()}): ${snippets}"
-        } else if(parsedMap){
+        } else if (parsedMap) {
             preview = "Map.keys: ${parsedMap.keySet()}"
         } else {
-            if(responseText?.size()) {
+            if (responseText?.size()) {
                 preview = responseText[0..Math.min(50, responseText.size())]
             } else {
                 preview = 'n.a.'
             }
         }
-        String s = "$statusCode ${verb.padRight(5)} (${getRequestType()}): ${origRequest.uri().toString()} -- response snippets: $preview" //-- Response: $preview"
+        String s = "$statusCode ${verb.padRight(5)} (${getRequestType()}): ${origRequest.uri().toString()} -- response snippets: $preview"
+        //-- Response: $preview"
     }
 
     Boolean shouldExportRequest() {
@@ -214,5 +241,25 @@ class FusionResponseWrapper {
 
         }
         return type
+    }
+
+    /**
+     * quick hack to see if response is JSON or XML, or other (stream, file,...)
+     * @return
+     */
+    boolean isJson(String body) {
+        String btrim = body?.trim()
+        boolean isjson = false
+        if(btrim){
+            if(btrim.startsWith('{') || btrim.startsWith('[')){
+                log.debug "Trimmed body started with '{' or '[', so we assume this is JSON"
+                isjson = true
+            } else {
+                log.debug "Trimmed body DID NOT start with '{' or '[', so we assume this is NOT VALID json"
+            }
+        } else {
+            log.info "Trimmed body was blank or null, should catch this before call, returning false (i.e. not JSON)"
+        }
+        return isjson
     }
 }
