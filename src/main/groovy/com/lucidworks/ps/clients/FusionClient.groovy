@@ -1015,7 +1015,7 @@ class FusionClient {
         return responseWrapper.parsedInfo
     }
 
-    Map<String,Object> getIndexPipeline(String pipelineId, String app = null) {
+    Map<String, Object> getIndexPipeline(String pipelineId, String app = null) {
         HttpResponse<String> response = null
         String url = null
         if (app) {
@@ -1191,30 +1191,49 @@ class FusionClient {
     }
 
 
+//    /**
+//     * get a list of datasources defined in the fusion cluster
+//     * @return
+//     */
+//    List<Map<String, Object>> getDataSources() {
+//        HttpResponse<String> response = null
+//        String url = "$fusionBase/api/connectors/datasources"
+//        log.info "No app given, getting all datasources"
+//        HttpRequest request = buildGetRequest(url)
+//        FusionResponseWrapper responseWrapper = sendFusionRequest(request)
+//
+//        return responseWrapper.parsedInfo
+//    }
+
+
     /**
-     * get a list of datasources defined in the fusion cluster
+     * get list of datasources with optional app name filter,
+     * @param appName
      * @return
      */
-    List<Map<String, Object>> getDataSources() {
+    List<Map<String, Object>> getDataSources(String appName = null) {
         HttpResponse<String> response = null
-        String url = "$fusionBase/api/connectors/datasources"
-        log.info "No app given, getting all datasources"
-        HttpRequest request = buildGetRequest(url)
-        FusionResponseWrapper responseWrapper = sendFusionRequest(request)
-
-        return responseWrapper.parsedInfo
-    }
-
-
-    List<Map<String, Object>> getDataSources(String appName) {
-        HttpResponse<String> response = null
-        String url = "$fusionBase/api/apps/${appName}/connectors/datasources"
-        log.info "app (${appName}) given, getting all datasources"
+        String url = null
+        if (appName) {
+            url = "$fusionBase/api/apps/${appName}/connectors/datasources"
+            log.info "app (${appName}) given, getting those datasources, url: $url"
+        } else {
+            url = "$fusionBase/api/connectors/datasources"
+            log.info "NO APP given, getting all datasources, url: $url"
+        }
         HttpRequest request = buildGetRequest(url)
         FusionResponseWrapper responseWrapper = sendFusionRequest(request)
         return responseWrapper.parsedInfo
     }
 
+    Map<String, Object> getDataSource(String datasourceId) {
+        HttpResponse<String> response = null
+        String url = "$fusionBase/api/apps/${appName}/connectors/datasources/$datasourceId"
+        log.info "getting datasource (${datasourceId}), url: $url"
+        HttpRequest request = buildGetRequest(url)
+        FusionResponseWrapper responseWrapper = sendFusionRequest(request)
+        return responseWrapper.parsedMap
+    }
 
     /**
      * create fusion datasource: $fusionBase/api/apps/${app}/connectors/datasources

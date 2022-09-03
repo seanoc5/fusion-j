@@ -103,6 +103,24 @@ class FusionClientTest extends Specification {
            qrypDef.id == appName
     }
 
+    def "should get specific datasource in app"() {
+        when:
+        Map qrypDef = client.getDataSource()
+
+        then:
+        qrypDef instanceof Map<String, Object>
+        qrypDef.id == appName
+    }
+
+    def "should get specific datasource WITHOUT app"() {
+        when:
+           Map qrypDef = client.getIndexPipeline(qrypName)
+
+           then:
+           qrypDef instanceof Map<String, Object>
+           qrypDef.id == appName
+    }
+
 /*
     def "test getApplication"() {
         given:
