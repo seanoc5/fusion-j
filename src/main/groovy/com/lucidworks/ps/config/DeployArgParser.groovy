@@ -17,7 +17,7 @@ class DeployArgParser {
         CliBuilder cli = new CliBuilder(usage: "${toolName}.groovy -s/Users/sean/data/MyExportedApp.zip", width: 160)
         cli.with {
             h longOpt: 'help', 'Show usage information'
-            a longOpt: 'appName', args: 1, required: false, argName: 'AppName', 'Application name to work on (optional, but required for some operations...)'
+            a longOpt: 'appName', args: 1, required: true, argName: 'AppName', 'Application name to work on (optional, but required for some operations...)'
             c longOpt: 'config', args: 1, required: true, type: File, argName: 'ConfigFile', "Configuration file (for ConfigSlurper)"
             f longOpt: 'fusionUrl', args: 1, required: false, argName: 'url', 'MAIN/Destination Fusion url with protocol, host, and port (if any)--for new/migrated app'
 //            g longOpt: 'groupLabel', args: 1, required: false, argName: 'group', defaultValue: 'TestGroup', 'Label for archiving/grouping objects; app name, environment, project,... freeform and optional'
