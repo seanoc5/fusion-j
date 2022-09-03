@@ -11,7 +11,10 @@ import java.nio.file.Paths
  * Note: this should be a functional test, not a unit test, refactor as appropriate...
  */
 class FusionClientTest extends Specification {
+    // todo -- make this more portable, currently limited to 'my' config, with a test app (F4), and hardcoded object names
     String appName = 'test'
+    String qrypName = appName
+    String idxpName = appName
     String furl = 'http://newmac:8764'
     FusionClient client = new FusionClient(furl, 'sean', 'pass1234', appName)
 
@@ -39,13 +42,65 @@ class FusionClientTest extends Specification {
     }
 
     def "test getApplications"() {
-//        given:
-
         when:
         def apps = client.getApplications()
 
         then:
         apps instanceof List<Map<String, Object>>
+    }
+
+    def "should get all querypipelines in an app"() {
+        when:
+        List qrypList = client.getQueryPipelines(appName)
+
+        then:
+        qrypList instanceof List<Map<String, Object>>
+        qrypList.size() > 1
+    }
+
+    def "should get specific querypipe in app"() {
+        when:
+        Map qrypDef = client.getQueryPipeline(qrypName, appName)
+
+        then:
+        qrypDef instanceof Map<String, Object>
+        qrypDef.id == appName
+    }
+
+    def "should get specific querypipe WITHOUT app"() {
+        when:
+           Map qrypDef = client.getQueryPipeline(qrypName)
+
+           then:
+           qrypDef instanceof Map<String, Object>
+           qrypDef.id == appName
+    }
+
+    def "should get all indexpipelines in an app"() {
+        when:
+        List qrypList = client.getIndexPipelines(appName)
+
+        then:
+        qrypList instanceof List<Map<String, Object>>
+        qrypList.size() > 1
+    }
+
+    def "should get specific indexpipe in app"() {
+        when:
+        Map qrypDef = client.getIndexPipeline(qrypName, appName)
+
+        then:
+        qrypDef instanceof Map<String, Object>
+        qrypDef.id == appName
+    }
+
+    def "should get specific indexpipe WITHOUT app"() {
+        when:
+           Map qrypDef = client.getIndexPipeline(qrypName)
+
+           then:
+           qrypDef instanceof Map<String, Object>
+           qrypDef.id == appName
     }
 
 /*
