@@ -415,7 +415,7 @@ class FusionClient {
         if (rc >= 200 && rc < 300) {
             log.info("\t\tResponse introspection result code: ${respIntro.statusCode()}")
             introspectInfo = jsonSlurper.parseText(respIntro.body())
-            log.info "\t\tFusion Introspection info (keys only): ${introspectInfo.keySet()}"
+            log.debug "\t\tFusion Introspection info (keys only): ${introspectInfo.keySet()}"
         } else {
             log.warn "Could not get valid Introspection information: ${this.fusionBase}"
         }
@@ -434,7 +434,8 @@ class FusionClient {
         HttpResponse response = fusionResponseWrapper.response
         if (fusionResponseWrapper.wasSuccess()) {
             Map info = fusionResponseWrapper.parsedInfo
-            log.info "Fall-back call to url base: ${urlBase} to get version information:${info.keySet()}"
+            log.debug "Fall-back call to url base: ${urlBase} to get version information:${info.keySet()}"
+            // todo -- find something better than info.keySet() for debug message
             versionString = info['app.version']
             majorVersion = getFusionMajorVersion(versionString)
         }
@@ -1014,6 +1015,25 @@ class FusionClient {
         return responseWrapper.parsedInfo
     }
 
+    Map<String,Object> getIndexPipeline(String pipelineId, String app = null) {
+        HttpResponse<String> response = null
+        String url = null
+        if (app) {
+            url = "$fusionBase/api/apps/${app}/index-pipelines/$pipelineId"
+            log.info "${app} app given, getting query pipeline: $pipelineId"
+
+        } else {
+            url = "$fusionBase/api/index-pipelines/$pipelineId"
+            log.info "no app given, getting query 'any' pipeline with id: $pipelineId"
+        }
+        log.info "\t get index pipeline ($pipelineId) for url: $url "
+        HttpRequest request = buildGetRequest(url)
+        FusionResponseWrapper responseWrapper = sendFusionRequest(request)
+
+        return responseWrapper.parsedMap
+    }
+
+
     /**
      * get a list index pipelines already defined/existing in the (destination/F5) Fusion deployment
      * @param app
@@ -1035,7 +1055,7 @@ class FusionClient {
         return responseWrapper.parsedInfo
     }
 
-    Object getQueryPipeline(String app, String qryPipelineId) {
+    Object getQueryPipeline(String qryPipelineId, String app = null) {
         HttpResponse<String> response = null
         String url = null
         if (app) {
@@ -1048,7 +1068,7 @@ class FusionClient {
         HttpRequest request = buildGetRequest(url)
         FusionResponseWrapper responseWrapper = sendFusionRequest(request)
 
-        return responseWrapper
+        return responseWrapper.parsedInfo
     }
 
     /**
@@ -1797,7 +1817,7 @@ class FusionClient {
         if (versionString) {
             return versionString
         } else {
-
+            log.warn "No version string found..."
         }
     }
 
