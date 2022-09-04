@@ -64,6 +64,7 @@ class FusionResponseWrapper {
 
                 if (body instanceof String) {
                     this.responseText = response.body()
+                    this.parsedInfo = response.body()
                     if (isJson(body)) {
                         log.debug "Response body starts with what looks like json '{' so parse as json (not xml)"
                         def obj = new JsonSlurper().parseText(body)
@@ -80,8 +81,6 @@ class FusionResponseWrapper {
                         } catch (Exception e) {
                             log.warn "Bad groovy-ness?? Map vs List vs 'def' issues?? error: $e"
                         }
-//                            log.debug "Error msg (json->map): $json"
-
 
                     } else if (responseText.startsWith('<')) {
                         log.warn "Looks like an xml response?!? MORE CODE here"
