@@ -4,8 +4,10 @@ import org.apache.commons.compress.archivers.zip.ZipFile
 import spock.lang.Specification
 
 import java.net.http.HttpRequest
+import java.net.http.HttpResponse
 import java.nio.file.Path
 import java.nio.file.Paths
+
 /**
  * Testing fusion client
  * Note: this should be a functional test, not a unit test, refactor as appropriate...
@@ -18,7 +20,7 @@ class FusionClientTest extends Specification {
     String furl = 'http://newmac:8764'
     FusionClient client = new FusionClient(furl, 'sean', 'pass1234', appName)
 
-    def "test buildClient"() {
+    def "should successfully buildClient"() {
 //        given:
 
         when:
@@ -29,7 +31,7 @@ class FusionClientTest extends Specification {
         client.majorVersion >= 4
     }
 
-    def "test buildGetRequest"() {
+    def "should buildGetRequest"() {
         given:
         String url = "$furl/api/apps"
 
@@ -41,7 +43,7 @@ class FusionClientTest extends Specification {
         request.uri().toString() == url
     }
 
-    def "test getApplications"() {
+    def "should getApplications"() {
         when:
         def apps = client.getApplications()
 
@@ -69,11 +71,11 @@ class FusionClientTest extends Specification {
 
     def "should get specific querypipe WITHOUT app"() {
         when:
-           Map qrypDef = client.getQueryPipeline(qrypName)
+        Map qrypDef = client.getQueryPipeline(qrypName)
 
-           then:
-           qrypDef instanceof Map<String, Object>
-           qrypDef.id == appName
+        then:
+        qrypDef instanceof Map<String, Object>
+        qrypDef.id == appName
     }
 
     def "should get all indexpipelines in an app"() {
@@ -96,11 +98,11 @@ class FusionClientTest extends Specification {
 
     def "should get specific indexpipe WITHOUT app"() {
         when:
-           Map qrypDef = client.getIndexPipeline(qrypName)
+        Map qrypDef = client.getIndexPipeline(qrypName)
 
-           then:
-           qrypDef instanceof Map<String, Object>
-           qrypDef.id == appName
+        then:
+        qrypDef instanceof Map<String, Object>
+        qrypDef.id == appName
     }
 
     def "should get specific datasource in app"() {
@@ -114,23 +116,54 @@ class FusionClientTest extends Specification {
 
     def "should get specific datasource WITHOUT app"() {
         when:
-           Map qrypDef = client.getIndexPipeline(qrypName)
+        Map qrypDef = client.getIndexPipeline(qrypName)
 
-           then:
-           qrypDef instanceof Map<String, Object>
-           qrypDef.id == appName
-    }
-
-/*
-    def "test getApplication"() {
-        given:
-
-        when:
-        // TODO implement stimulus
         then:
-        // TODO implement assertions
+        qrypDef instanceof Map<String, Object>
+        qrypDef.id == appName
     }
-*/
+
+    def "should get all blob definitions WITHOUT app"() {
+        when:
+        List<Map<String, Object>> blobDefs = client.getBlobDefinitions()
+
+        then:
+        blobDefs instanceof List<Map<String, Object>>
+        blobDefs.size() > 1
+    }
+
+    def "should get blob definitions WITHOUT app and various filtereing"() {
+        when:
+        List<Map<String, Object>> blobDefsAll = client.getBlobDefinitions()
+        List<Map<String, Object>> blobDefsFile = client.getBlobDefinitions('','file')
+        List<Map<String, Object>> blobDefsSingle = client.getBlobDefinitions('','file', 'aw-firefox.json')
+        List<Map<String, Object>> blobDefsByPattern = client.getBlobDefinitions('','file', ~/(aw-firefox|.*arxiv.*).json/)
+
+        then:
+        blobDefsAll instanceof List<Map<String, Object>>
+        blobDefsAll.size() > blobDefsFile.size()
+        blobDefsSingle.size()==1
+        blobDefsByPattern.size()==2
+    }
+
+    def "should get single text blob WITHOUT app"() {
+        when:
+        def blobFF = client.getBlob('sampleLocations.csv')
+
+        then:
+        blobFF
+    }
+
+    // todo -- fix this -- add more logic for processing and testing binary blobs -- currently fails
+    def "should get binary text blob nlp/models/en-chunker.bin"() {
+        when:
+        HttpResponse.BodyHandler bodyHandler = HttpResponse.BodyHandlers.ofInputStream()
+        def blobFF = client.getBlob('nlp/models/en-chunker.bin', bodyHandler)
+
+        then:
+        blobFF
+    }
+
 
 /*
     def "test getFusionInformation"() {
@@ -143,7 +176,7 @@ class FusionClientTest extends Specification {
     }
 */
 
-    def "test isValidFusionClient"() {
+    def "isValidFusionClient"() {
 //        given:
 
         when:
@@ -153,7 +186,7 @@ class FusionClientTest extends Specification {
         isValid == true
     }
 
-    def "test query"() {
+    def "query should return json result object"() {
         given:
         String q = '*:*'
         String collName = appName
@@ -161,14 +194,18 @@ class FusionClientTest extends Specification {
         Map qryParams = [q: q]
 
         when:
-        FusionResponseWrapper fwr = client.query(appName, collName, qrypName, qryParams,)
-        Map info = fwr.parsedInfo
-        Map response = info.response
+        Map result = client.query(appName, collName, qrypName, qryParams,)
+        Map response = result.response                          // standard oddity in solr response naming, so calling the solr 'response' as 'results' rather than response.response ...
+        FusionResponseWrapper fwr = client.responses[-1]        // hack getting last response, but ok in this test..?
+        def info = fwr.parsedInfo
+        def nf = response.numFound
 
         then:
+        info instanceof Map
         fwr.wasSuccess()
         response.keySet().contains('numFound')
-
+        nf instanceof Integer
+        nf > 0
     }
 
 /*
