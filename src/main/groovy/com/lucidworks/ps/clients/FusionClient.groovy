@@ -13,6 +13,7 @@ import org.apache.log4j.Logger
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.net.http.HttpResponse.BodyHandler
 import java.nio.file.Path
 import java.time.Duration
 
@@ -477,7 +478,7 @@ class FusionClient {
      * execute 'basic query'
      * e.g. https://radar.lucidworks.com/api/apps/Lucy/query-pipelines/lucy-basic-qryp/collections/Lucy/select?echoParams=all&wt=json&json.nl=arrarr&debug=timing&debug=query&debug=results&fl=score,*&sort&start=0&q=Joti dhillon (csm "customer success")&rows=10
      */
-    def query(String app, String collection, String queryPipeline, Map<String, Object> qparams = [:], String reqHandler = 'select') {
+    Map<String, Object> query(String app, String collection, String queryPipeline, Map<String, Object> qparams = [:], String reqHandler = 'select') {
 
         URIBuilder ub = new URIBuilder("${this.fusionBase}/api/apps/${app}/query-pipelines/${queryPipeline}/collections/${collection}/${reqHandler}")
 //        URI uri = URI.create("${this.fusionBase}/api/apps/${app}/query-pipelines/${queryPipeline}/collections/${collection}/${reqHandler}")
@@ -494,9 +495,9 @@ class FusionClient {
         FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
         if (fusionResponseWrapper.wasSuccess()) {
             def info = fusionResponseWrapper.parsedInfo
-            log.info "\t\tNum found: ${info.response?.numFound}"
+            log.debug "\t\tNum found: ${info.response?.numFound}"       // remove me???
         }
-        return fusionResponseWrapper
+        return fusionResponseWrapper.parsedMap
     }
 
 
@@ -1039,7 +1040,7 @@ class FusionClient {
      * @param app
      * @return
      */
-    Object getQueryPipelines(String app) {
+    Object getQueryPipelines(String app = null) {
         HttpResponse<String> response = null
         String url = null
         if (app) {
@@ -1816,7 +1817,14 @@ class FusionClient {
         return fusionResponseWrapper
     }
 
-    def getBlobs(String app = '', String resourceType = '') {
+    /**
+     * call to get blob definitions (not download the actual objects)
+     * @param app
+     * @param blobFilter
+     * @param resourceType
+     * @return list of blob definitions
+     */
+    List<Map<String, Object>> getBlobDefinitions(String app = '', String resourceType = '', def blobIdFilter = null) {
         String url
         if (app) {
             url = "${fusionBase}/api/apollo/apps/{{app}}/blobs"
@@ -1826,10 +1834,37 @@ class FusionClient {
         if (resourceType) {
             url += "?resourceType=${resourceType}"
         }
+//        if(blobIdFilter){
+//            if(blobIdFilter instanceof String){
+//                log.info ""
+//            }
+//        }
         log.info "\t\t Get blobs -- app:${app}  -- type(${resourceType})"
         HttpRequest request = buildGetRequest(url)
         FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
-        return fusionResponseWrapper
+        List blobDefs = null
+        if (blobIdFilter) {
+            blobDefs = fusionResponseWrapper.parsedList.findAll { it.id ==~ blobIdFilter }
+        } else {
+            blobDefs = fusionResponseWrapper.parsedList
+        }
+        return blobDefs
+    }
+
+    /**
+     * call to get an unspecified bloc
+     * todo -- improve binary blobs, currently this focuses on text, or zipfiles, other blobs will likely fail...
+     * @param blobId
+     * @param bodyHandler
+     * @return an object as returned by FusionResponseWrapper
+     */
+    def getBlob(String blobId, BodyHandler bodyHandler = HttpResponse.BodyHandlers.ofString()) {
+        String url = "${fusionBase}/api/blobs/${blobId}"
+        log.info "\t\t Get blob thing with id: $blobId"
+        HttpRequest request = buildGetRequest(url)
+        FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request, bodyHandler)
+        def blob = fusionResponseWrapper.parsedInfo
+        return blob
     }
 
     String getFusionVersion() {
