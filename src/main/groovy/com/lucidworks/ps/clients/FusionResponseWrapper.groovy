@@ -1,16 +1,14 @@
 package com.lucidworks.ps.clients
 
+import com.lucidworks.ps.Helper
 import groovy.json.JsonSlurper
-import org.apache.commons.compress.archivers.zip.ZipArchiveEntry
 import org.apache.commons.compress.archivers.zip.ZipFile
-import org.apache.commons.compress.utils.SeekableInMemoryByteChannel
-import org.apache.commons.io.IOUtils
 import org.apache.groovy.json.internal.LazyMap
 import org.apache.log4j.Logger
 
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
-
+import java.net.http.HttpResponse.BodyHandler
 /**
  * Helper class to provide some basic handling of requests and responses.
  * These objects may be collected/stored in the calling code for a history of actions performed (and any errors) during an upgrade/migration
@@ -21,9 +19,9 @@ import java.net.http.HttpResponse
 class FusionResponseWrapper {
     Logger log = Logger.getLogger(this.class.name);
     /** original request sent to fusion */
-    HttpRequest origRequest
+    HttpRequest httpRequest
     /** standard response object, strong assumption this will be handled by a string body parser */
-    HttpResponse response
+    HttpResponse httpResponse
     /** convenience property for the actual string response -- todo revisit if we need anything other than string response */
     String responseText
     /** Java Map version of the parsed object (as opposed to list version--should be either/or)  */
@@ -40,31 +38,32 @@ class FusionResponseWrapper {
     String statusMessage
     /** helper property to track timeline (roughly) -- time of this wrapper's creation, might potentially deviate from actual request time */
     Date timestamp
+    BodyHandler bodyHandler
 
     /**
      * Typical constructor -- usually done after request has been sent and response has been received
      * This is an optional object intended for saving/reviewing what has taken place during an fusion management (e.g. upgrade/migration) process
-     * @param origRequest
-     * @param fusionResponse
+     * @param httpRequest* @param httpResponse
      */
-    FusionResponseWrapper(HttpRequest origRequest, HttpResponse fusionResponse) {
+    FusionResponseWrapper(HttpRequest httpRequest, HttpResponse httpResponse, BodyHandler handler) {
         // todo -- revisit if we process anything other than JSON responses (request/response specify json --text)
-        log.debug "\t\tStandard FusionResponseWrapper Constructor (req, resp): req:$origRequest -- resp:$fusionResponse"
-        statusCode = fusionResponse.statusCode()
+        log.debug "\t\tStandard FusionResponseWrapper Constructor (req, resp): req:$httpRequest -- resp:$httpResponse"
+        statusCode = httpResponse.statusCode()
         this.timestamp = new Date()
-        this.origRequest = origRequest
-        this.response = fusionResponse
+        this.httpRequest = httpRequest
+        this.httpResponse = httpResponse
+        bodyHandler = handler
 
         if (wasSuccess()) {
-            log.debug "Successfull call:$origRequest -- response:$response "
-            def body = response.body()
+            log.debug "Successfull call:$httpRequest -- response:$this.httpResponse "
+            def body = this.httpResponse.body()
             if (body) {
                 String bodyType = body.getClass().name
                 log.debug "Body class: ${bodyType}"
 
                 if (body instanceof String) {
-                    this.responseText = response.body()
-                    this.parsedInfo = response.body()
+                    this.responseText = this.httpResponse.body()
+                    this.parsedInfo = this.httpResponse.body()
                     if (isJson(body)) {
                         log.debug "Response body starts with what looks like json '{' so parse as json (not xml)"
                         def obj = new JsonSlurper().parseText(body)
@@ -72,10 +71,10 @@ class FusionResponseWrapper {
                         try {
                             if (obj instanceof List) {
                                 parsedList = obj
-                                log.debug "\t\tGot back a list for request: $origRequest"
+                                log.debug "\t\tGot back a list for request: $httpRequest"
                             } else if (obj instanceof Map) {
                                 parsedMap = obj
-                                log.debug "\t\tGot back a Map for request: $origRequest"
+                                log.debug "\t\tGot back a Map for request: $httpRequest"
                             }
                             parsedInfo = obj
                         } catch (Exception e) {
@@ -88,27 +87,18 @@ class FusionResponseWrapper {
                 } else if (bodyType.containsIgnoreCase('file')) {
                     log.warn "Processing FILE response.... MORE CODE HERE"
 
-                } else if (bodyType.containsIgnoreCase('stream')) {
+                } else if (body instanceof InputStream) {
+//                } else if (bodyType.containsIgnoreCase('stream')) {
                     // todo add code for OTHER streams, or files that are not zipfiles
-                    ZipFile zipFile
-                    try {
-                        log.warn "Processing stream response.... MORE CODE HERE (i.e. non-zipfile requests...)"
-                        InputStream stream = body
-                        SeekableInMemoryByteChannel channel = new SeekableInMemoryByteChannel(IOUtils.toByteArray(stream));
-                        zipFile = new ZipFile(channel)
-                        Enumeration<ZipArchiveEntry> entries = zipFile.getEntries()
-                        parsedList = Collections.list(entries)
-                        parsedMap = parsedList.collectEntries { [it.name, it] }
-                        parsedInfo = entries
-                    } finally {
-                        if (zipFile) {
-                            zipFile.close()
-                        }
-                    }
+                    log.info "Processing stream response.... MORE CODE HERE (i.e. non-zipfile requests, \"what else floats?\" -- small pebbles? what other calls, NLP models seem to be zips, as are jars...)"
+                    ZipFile zipFileMemory = Helper.processStream((InputStream)body)         // todo -- is there a better approach for determining/abstracting stream...???
+                    parsedInfo = zipFileMemory
                 }
 
+//            } else if() {
+
             } else {
-                String uri = origRequest.uri().toString()
+                String uri = httpRequest.uri().toString()
                 if (uri.containsIgnoreCase('api/session')) {
                     log.debug "No response text for session"
 
@@ -117,7 +107,7 @@ class FusionResponseWrapper {
                 }
             }
         } else {
-            log.warn("Request filed??) Status: ${response.statusCode()} -- Not a successful request ($origRequest) -> response:($response)??  --body: ${response?.body()}")
+            log.warn("Request fialed??) Status: ${this.httpResponse.statusCode()} -- Not a successful request ($httpRequest) -> response:($this.httpResponse)??  --body: ${this.httpResponse?.body()}")
         }
     }
 
@@ -126,8 +116,8 @@ class FusionResponseWrapper {
  * @return
  */
     boolean wasSuccess() {
-        if (origRequest && response) {
-            if (response.statusCode() >= 200 && response.statusCode() < 300) {
+        if (httpRequest && httpResponse) {
+            if (httpResponse.statusCode() >= 200 && httpResponse.statusCode() < 300) {
                 return true
             }
         }
@@ -139,7 +129,7 @@ class FusionResponseWrapper {
  * @return
  */
     String toString() {
-        String verb = origRequest.method()
+        String verb = httpRequest.method()
         String infoType = parsedInfo instanceof LazyMap ? "LazyMap" : parsedInfo?.class?.name
         String preview = null
         if (parsedList) {
@@ -159,27 +149,27 @@ class FusionResponseWrapper {
                 preview = 'n.a.'
             }
         }
-        String s = "$statusCode ${verb.padRight(5)} (${getRequestType()}): ${origRequest.uri().toString()} -- response snippets: $preview"
+        String s = "$statusCode ${verb.padRight(5)} (${getRequestType()}): ${httpRequest.uri().toString()} -- response snippets: $preview"
         //-- Response: $preview"
     }
 
     Boolean shouldExportRequest() {
         boolean export = false
-        if (origRequest?.method() == 'POST' || origRequest?.method() == 'PUT') {
-            if (origRequest.uri().toString().containsIgnoreCase('api/session')) {
-                log.debug "do not export session calls (POST): $origRequest..."
+        if (httpRequest?.method() == 'POST' || httpRequest?.method() == 'PUT') {
+            if (httpRequest.uri().toString().containsIgnoreCase('api/session')) {
+                log.debug "do not export session calls (POST): $httpRequest..."
             } else {
-                log.info "Export $origRequest"
+                log.info "Export $httpRequest"
                 export = true
             }
         } else {
-            log.debug "do not export request (not POST or PUT): $origRequest"
+            log.debug "do not export request (not POST or PUT): $httpRequest"
         }
         return export
     }
 
     String getRequestType() {
-        String url = origRequest?.uri()?.toString()
+        String url = httpRequest?.uri()?.toString()
         String type = null
         switch (url) {
             case ~/.*api.session.*/:
@@ -249,8 +239,8 @@ class FusionResponseWrapper {
     boolean isJson(String body) {
         String btrim = body?.trim()
         boolean isjson = false
-        if(btrim){
-            if(btrim.startsWith('{') || btrim.startsWith('[')){
+        if (btrim) {
+            if (btrim.startsWith('{') || btrim.startsWith('[')) {
                 log.debug "Trimmed body started with '{' or '[', so we assume this is JSON"
                 isjson = true
             } else {

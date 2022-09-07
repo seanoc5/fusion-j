@@ -5,9 +5,9 @@ import spock.lang.Specification
 
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
-
 /**
  * Testing fusion client
  * Note: this should be a functional test, not a unit test, refactor as appropriate...
@@ -51,7 +51,7 @@ class FusionClientTest extends Specification {
         apps instanceof List<Map<String, Object>>
     }
 
-    def "should get all querypipelines in an app"() {
+    def "broken - should get all querypipelines in an app"() {
         when:
         List qrypList = client.getQueryPipelines(appName)
 
@@ -89,7 +89,8 @@ class FusionClientTest extends Specification {
 
     def "should get specific indexpipe in app"() {
         when:
-        Map qrypDef = client.getIndexPipeline(qrypName, appName)
+        List qrypDefs = client.getIndexPipelines(appName, qrypName)
+        Map qrypDef = qrypDefs[0]
 
         then:
         qrypDef instanceof Map<String, Object>
@@ -98,14 +99,15 @@ class FusionClientTest extends Specification {
 
     def "should get specific indexpipe WITHOUT app"() {
         when:
-        Map qrypDef = client.getIndexPipeline(qrypName)
+        List pipelines = client.getIndexPipelines(null, qrypName)
+        Map qrypDef = pipelines[0]
 
         then:
         qrypDef instanceof Map<String, Object>
         qrypDef.id == appName
     }
 
-    def "should get specific datasource in app"() {
+    def "broken - should get specific datasource in app"() {
         when:
         Map qrypDef = client.getDataSource()
 
@@ -116,7 +118,8 @@ class FusionClientTest extends Specification {
 
     def "should get specific datasource WITHOUT app"() {
         when:
-        Map qrypDef = client.getIndexPipeline(qrypName)
+        List pipelines = client.getIndexPipelines('', qrypName)
+        Map qrypDef = pipelines[0]
 
         then:
         qrypDef instanceof Map<String, Object>
@@ -155,7 +158,7 @@ class FusionClientTest extends Specification {
     }
 
     // todo -- fix this -- add more logic for processing and testing binary blobs -- currently fails
-    def "should get binary text blob nlp/models/en-chunker.bin"() {
+    def "broken - should get binary text blob nlp/models/en-chunker.bin"() {
         when:
         HttpResponse.BodyHandler bodyHandler = HttpResponse.BodyHandlers.ofInputStream()
         def blobFF = client.getBlob('nlp/models/en-chunker.bin', bodyHandler)
@@ -227,46 +230,75 @@ class FusionClientTest extends Specification {
     }
 */
 
-/*
-    def "export objects ofFile response - collection test"() {
+
+    // probably not a good approach, consider in-memory approach by default? I don't like writing directly to filesystem (justified concern???)
+    def "export objects ofFile (zip) response - collection.ids test"() {
         given:
-        List<String> collectionToGet = ['upval', 'Keymatches']
+//        List<String> collectionToGet = ['upval', 'Keymatches']
         String exportParams = 'collection.ids=test'
         Path exportFolder = Paths.get(getClass().getResource('/').toURI())
-        Path exportZip = Paths.get(exportFolder.toAbsolutePath().toString(), 'collection.test.zip')
+        String zipPath = exportFolder.toAbsolutePath().toString()
+        Path exportZip = Paths.get(zipPath, 'collection.test.zip')
+        println "Export zip file: ${exportZip.toAbsolutePath()}"
+        def bodyHandler = HttpResponse.BodyHandlers.ofFile(exportZip)
+//        FileAttributeView fav = Files.getFileAttributeView(exportZip)
 
         when:
-        FusionResponseWrapper fusionResponseWrapper = client.exportFusionObjects(exportParams, exportZip)
+        FusionResponseWrapper fusionResponseWrapper = client.exportFusionObjects(exportParams, bodyHandler)
         def results = fusionResponseWrapper.parsedInfo
         Map map = fusionResponseWrapper.parsedMap
         Map list = fusionResponseWrapper.parsedList
 
-
         then:
-        map instanceof Map
-        map.size() > 0
-        map['objects.json']
+        Files.exists(exportZip)
 
     }
-*/
 
+
+    // better approach? keep things in memory for more flexible handling transforming?? BEWARE memory issues...
     def "export objects inputstream response - collection test"() {
         given:
-        List<String> collectionToGet = ['upval', 'Keymatches']
         String exportParams = 'collection.ids=test'
         Path exportFolder = Paths.get(getClass().getResource('/').toURI())
         Path exportZip = Paths.get(exportFolder.toAbsolutePath().toString(), 'collection.test.zip')
 
         when:
         FusionResponseWrapper fusionResponseWrapper = client.exportFusionObjects(exportParams)
-        def results = fusionResponseWrapper.parsedInfo
+        def zipFile = fusionResponseWrapper.parsedInfo              // does this make sense? FRW calls helper to convert stream to something zip-file-ish...?
         Map map = fusionResponseWrapper.parsedMap
         List list = fusionResponseWrapper.parsedList
 
 
         then:
-        map instanceof Map
-        map.size() > 0
-        map['objects.json'] instanceof ZipFile.Entry
+        zipFile
+        zipFile instanceof ZipFile
+        map == null         // assuming there is nothing parse, beyond the zipfile/stream...
+        list == null
+    }
+
+
+    def "get various collectionDefinitions"() {
+        given:
+        String collName = appName
+
+        when:
+        def allColls = client.getCollectionDefinitions()
+        def filteredColls = client.getCollectionDefinitions(null, ~/t.*/)
+        def filteredAppColls = client.getCollectionDefinitions(appName)
+        def filteredAppMainColl = client.getCollectionDefinitions(appName, collName)
+
+        def singleCollection = client.getCollectionDefinition(appName, collName)
+
+        then:
+        allColls instanceof List
+        allColls.size() > 50         // todo -- improve test logic & abstraction
+
+        filteredColls instanceof List<Map<String, Object>>
+        filteredColls.size() < allColls.size()
+
+        filteredAppColls.size() != filteredColls
+
+        filteredAppMainColl.size() == 1
+        filteredAppMainColl[0].id == singleCollection.id
     }
 }

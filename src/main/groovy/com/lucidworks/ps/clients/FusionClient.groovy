@@ -16,6 +16,7 @@ import java.net.http.HttpResponse
 import java.net.http.HttpResponse.BodyHandler
 import java.nio.file.Path
 import java.time.Duration
+import java.util.regex.Pattern
 
 /**
  * attempt to replicate solrj client-ness for fusion
@@ -178,9 +179,9 @@ class FusionClient {
 
         try {
             HttpRequest request = buildPostRequest(urlSession, authJson)
-
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString())
-            FusionResponseWrapper fusionResponseWrapper = new FusionResponseWrapper(request, response)
+            BodyHandler<String> handler = HttpResponse.BodyHandlers.ofString()
+            HttpResponse<String> response = client.send(request, handler)
+            FusionResponseWrapper fusionResponseWrapper = new FusionResponseWrapper(request, response, handler)
             responses << fusionResponseWrapper
             if (response.statusCode() < 300) {
                 log.debug("\t\tResponse status: " + response.statusCode())
@@ -195,7 +196,7 @@ class FusionClient {
         } catch (Exception e) {
             log.warn "Problem getting client: $e"
             client = null
-            throw new IllegalArgumentException("Could not get valid cllient with session call, bailing by rethrowing error")
+            throw new IllegalArgumentException("Could not get valid client with session call, bailing by rethrowing error")
         }
 
         this.httpClient = client
@@ -432,7 +433,7 @@ class FusionClient {
         String url = "$fusionBase/${urlBase}"
         HttpRequest request = buildGetRequest(url)
         FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
-        HttpResponse response = fusionResponseWrapper.response
+        HttpResponse response = fusionResponseWrapper.httpResponse
         if (fusionResponseWrapper.wasSuccess()) {
             Map info = fusionResponseWrapper.parsedInfo
             log.debug "Fall-back call to url base: ${urlBase} to get version information:${info.keySet()}"
@@ -495,7 +496,7 @@ class FusionClient {
         FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request)
         if (fusionResponseWrapper.wasSuccess()) {
             def info = fusionResponseWrapper.parsedInfo
-            log.debug "\t\tNum found: ${info.response?.numFound}"       // remove me???
+            log.debug "\t\tNum found: ${info.httpResponse?.numFound}"       // remove me???
         }
         return fusionResponseWrapper.parsedMap
     }
@@ -818,7 +819,7 @@ class FusionClient {
      *
      * @param exportParams
      * @param bodyHandler how to retrieve response body -- typically stream hanlder
-     * @return
+     * @return FRW with parsedInfo holding the exported 'stuff' -- currently a parsed ZipFile, but this should be refactored?
      */
     FusionResponseWrapper exportFusionObjects(String exportParams, def bodyHandler = HttpResponse.BodyHandlers.ofInputStream()) {
 //    HttpResponse<Path> exportFusionObjects(String exportParams, Path outputPath) {
@@ -872,7 +873,7 @@ class FusionClient {
      */
     public FusionResponseWrapper sendFusionRequest(HttpRequest request, HttpResponse.BodyHandler bodyHandler = HttpResponse.BodyHandlers.ofString()) {
         HttpResponse<String> response = httpClient.send(request, bodyHandler)
-        FusionResponseWrapper fusionResponse = new FusionResponseWrapper(request, response)
+        FusionResponseWrapper fusionResponse = new FusionResponseWrapper(request, response, bodyHandler)
 
         responses << fusionResponse // add this response to the client's collection of responses
         if (fusionResponse.wasSuccess()) {
@@ -900,24 +901,58 @@ class FusionClient {
     }
 
     /**
-     * Get a list of existing collections in a given application
-     * @param appName
+     * Get a list of existing collection definitions (Json Maps) within an optional application
+     * @param appId optional filter to collections in a given app
+     * @param idFilter optional String or Pattern filter
      * @return
      */
-    List<Map<String, Object>> getCollections(String appName) {
-        String url = "$fusionBase/api/apps/${appName}/collections"
-        log.debug "List collections for app $appName url: $url "
+    List<Map<String, Object>> getCollectionDefinitions(String appId = null, def idFilter = null) {
+        String url = appId ? "$fusionBase/api/apps/${appId}/collections" : "$fusionBase/api/collections"
         HttpRequest request = buildGetRequest(url)
         FusionResponseWrapper responseWrapper = sendFusionRequest(request)
-        return responseWrapper.parsedInfo
+        List collections = responseWrapper.parsedList
+        if (idFilter) {
+            log.debug "Filtering returned Collections by: ($idFilter)..."
+            collections = responseWrapper.parsedList.findAll {
+                if (idFilter instanceof Pattern) {
+                    it.id ==~ idFilter
+                } else {
+                    it.id == idFilter
+                }
+            }
+
+        }
+        def collIdList = collections.collect { it.id }
+        log.info "Found (${collections.size()}) collections for (appId: $appId)  ::  (idFilter: $idFilter) --> url: $url "
+        log.debug "Found collection ids: $collIdList"
+        return collections
     }
 
-    FusionResponseWrapper getCollection(String appName, String collectionName) {
-        String url = "$fusionBase/api/apps/${appName}/collections/$collectionName"
-        log.info "List collection:($collectionName) for app $appName url: $url "
-        HttpRequest request = buildGetRequest(url)
-        FusionResponseWrapper responseWrapper = sendFusionRequest(request)
-        return responseWrapper
+    /**
+     * get the api collections output (as opposed to the objects export configsets, called the same thing...)
+     * @param appId optional filter of app id (AppName is often the same, but not always, we use the id here)
+     * @param idFilter optional id String (exact match) or id @Pattern which will do a regex match
+     * @return the Json Map of the collection definition
+     * @throws IllegalArgumentException
+     */
+    Map<String, Object> getCollectionDefinition(String appId, def idFilter) throws IllegalArgumentException {
+        log.info "List collection:(idFilter: $idFilter) for app $appName  (call getCollections)... "
+        List collections = getCollectionDefinitions(appId, idFilter)
+        if (collections) {
+            Map collection = collections[0]
+            if (collections.size() ==1) {
+                log.info "\t\tFound a single collection (as expected), return it (as a map) rather than the single-element list... (${collection.id}}"
+            } else {
+                String msg = "More than one collection returned (${collections.size()} :: ${collections.collect { it.id }})"
+                log.error(msg)
+                throw new IllegalArgumentException(msg)
+
+            }
+            return collection
+        } else {
+            log.warn "Could not find collection ($idFilter) in App ($appId), returning null..."
+            return null
+        }
     }
 
 
@@ -1000,7 +1035,7 @@ class FusionClient {
      * @param app
      * @return
      */
-    Object getIndexPipelines(String app) {
+    Object getIndexPipelines(String app = null, def idFilter = null) {
         HttpResponse<String> response = null
         String url = null
         if (app) {
@@ -1012,10 +1047,17 @@ class FusionClient {
         log.info "\t list idx pipelines for url: $url "
         HttpRequest request = buildGetRequest(url)
         FusionResponseWrapper responseWrapper = sendFusionRequest(request)
+        List<Map<String, Object>> pipelines = responseWrapper.parsedList
+        if (idFilter) {
+            List filteredList = pipelines.findAll { it.id ==~ idFilter }
+            return filteredList
+        }
 
         return responseWrapper.parsedInfo
     }
 
+/*
+// move to getIndexPipelines with idFilter....
     Map<String, Object> getIndexPipeline(String pipelineId, String app = null) {
         HttpResponse<String> response = null
         String url = null
@@ -1033,6 +1075,7 @@ class FusionClient {
 
         return responseWrapper.parsedMap
     }
+*/
 
 
     /**
@@ -1040,7 +1083,7 @@ class FusionClient {
      * @param app
      * @return
      */
-    Object getQueryPipelines(String app = null) {
+    List<Map<String, Object>> getQueryPipelines(def idFilter = null, String app = null) {
         HttpResponse<String> response = null
         String url = null
         if (app) {
@@ -1052,8 +1095,14 @@ class FusionClient {
         log.info "\t list query pipelines for url: $url "
         HttpRequest request = buildGetRequest(url)
         FusionResponseWrapper responseWrapper = sendFusionRequest(request)
-
-        return responseWrapper.parsedInfo
+        List<Map<String, Object>> qrypList = responseWrapper.parsedList
+        if (idFilter) {
+            List<Map<String, Object>> filteredList = qrypList.findAll { it.id ==~ idFilter }
+            log.info "return filtered ($idFilter) list (${filteredList.size()}) down from total (${qrypList.size()})"
+            return filteredList
+        } else {
+            return qrypList
+        }
     }
 
     Object getQueryPipeline(String qryPipelineId, String app = null) {
@@ -1090,7 +1139,7 @@ class FusionClient {
 
             FusionResponseWrapper responseWrapper = sendFusionRequest(request)
 
-            response = responseWrapper.response
+            response = responseWrapper.httpResponse
 
         } catch (IllegalArgumentException iae) {
             log.error "IllegalArgumentException creating INDEX PIPELINE($name): $iae"
@@ -1117,7 +1166,7 @@ class FusionClient {
 
             FusionResponseWrapper responseWrapper = sendFusionRequest(request)
 
-            response = responseWrapper.response
+            response = responseWrapper.httpResponse
 
         } catch (IllegalArgumentException iae) {
             log.error "IllegalArgumentException creating QUERY PIPELINE($name): $iae"
@@ -1463,7 +1512,7 @@ class FusionClient {
 
     List<FusionResponseWrapper> addCollectionsIfMissing(String appName, Map srcFusionObjects) {
         List<FusionResponseWrapper> responses = []
-        List<Map<String, Object>> existingCollections = getCollections(appName)
+        List<Map<String, Object>> existingCollections = getCollectionDefinitions(appName)
 
         // --------------- Create Collections ------------------
         srcFusionObjects['collections'].each { Map<String, Object> coll ->
@@ -1713,19 +1762,19 @@ class FusionClient {
             log.warn "Faled to get Object links!!?! Response wrapper: $fusionResponseWrapper"
         }
         return fusionResponseWrapper.parsedMap.configSets
-        // todo -- consider refactoring to return FusionResponseWrapper like other calls...
     }
 
-/**
- * get a list of solr config 'things' -- placeholders that then need to be loaded individually
- * note: {{furl}}/api/solrAdmin/default/admin/configs?action=LIST&recursive=true
- * @param collectionName
- * @param configObject
- * @param params
- * @param handler
- * @return list of entries in zookeeper (need to load each one, and possibly recursively for something like `lang`
- */
+    /**
+     * get a list of solr config 'things' -- placeholders that then need to be loaded individually
+     * note: {{furl}}/api/solrAdmin/default/admin/configs?action=LIST&recursive=true
+     * @param collectionName
+     * @param configObject
+     * @param params
+     * @param handler
+     * @return list of entries in zookeeper (need to load each one, and possibly recursively for something like `lang`
+     */
     List<Map<String, Object>> getSolrConfigList(String collectionName, Map<String, String> params = [expand: 'true', 'recursive': 'true']) {
+        // todo -- convert to proper URL with encoding params
         String url = "$fusionBase/api/collections/${collectionName}/solr-config"
         if (params) {
             url = "$url?${params.collect { "${it.key}=${it.value}" }.join('&')}"
@@ -1779,13 +1828,13 @@ class FusionClient {
 
     }
 
-/**
- * use fusion passthrough api to get "combined" schema from Solr (includes overlay.json....)
- * url format: {{furl}}/api/solr/{{coll}}/schema
- * @param collectionName
- * @param params
- * @return
- */
+    /**
+     * use fusion passthrough api to get "combined" schema from Solr (includes overlay.json....)
+     * url format: {{furl}}/api/solr/{{coll}}/schema
+     * @param collectionName
+     * @param params, e.g. action: LISt and
+     * @return
+     */
     def getSolrSchema(String collectionName, Map<String, String> params = [action: 'LIST', wt: 'json']) {
 //        String url = "$fusionBase/api/objects/export?collection.ids=${collectionName}"
         String url = "$fusionBase/api/solr/${collectionName}/schema"

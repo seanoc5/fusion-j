@@ -1,5 +1,9 @@
 package com.lucidworks.ps
 
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry
+import org.apache.commons.compress.archivers.zip.ZipFile
+import org.apache.commons.compress.utils.SeekableInMemoryByteChannel
+import org.apache.commons.io.IOUtils
 import org.apache.log4j.Logger
 
 import java.text.DateFormat
@@ -73,6 +77,55 @@ class Helper {
             log.info "Body was not a string, but rather class: ${body.getClass().name} -- not json"
         }
         false
+    }
+
+
+    /** experimenting with in-memory stream->zip file (move me??)
+     *
+     * @param stream from something like a call to objects/export api with a @BodyHandlers.ofInputStream
+     * @return something... (currently an in-memory zip file from Apache commons compress...)
+     */
+    static def processStream(InputStream stream) throws IOException{
+        ZipFile zipFile
+        try {
+            SeekableInMemoryByteChannel channel = new SeekableInMemoryByteChannel(IOUtils.toByteArray(stream));
+            zipFile = new ZipFile(channel)
+            Enumeration<ZipArchiveEntry> entries = zipFile.getEntries()
+            log.info "Converted Stream (objects/export API call/download?) to ZipArchiveEntry enum: ${entries}"
+        } catch (IOException ioe){
+            log.warn "Had problem converting Stream (export api call???) to ZipFile (possibly not a zip file we are getting??): $ioe"
+            throw ioe
+        } finally {
+            if (zipFile) {
+                log.debug "Closing zipfile..."
+                zipFile.close()
+            }
+        }
+        return zipFile
+    }
+
+
+    /**
+     *
+     * @param objectsMap - either a basic JsonSlurper object, or the very similar JsonObject wrapper of that
+     * @param blobsFolder - a structure mimicking the filesystem structure created when unziping an exported Fusion4+ app for blobs (these are the actual blobs, rather than the blob definitions in the objectsMap/objects.json)
+     * @param configsetsFolder - a structure mimicking the filesystem structure created when unziping an exported Fusion4+ app -- these are Solr configsets which should match a zk downconfig for each solr collection
+     * @return
+     */
+    ZipFile buildImportableZip(Map objectsMap, def blobsFolder, def configsetsFolder){
+        ZipFile importableZip = null
+        try {
+            InputStream stream = new BufferedInputStream(objectsMap)
+            SeekableInMemoryByteChannel channel = new SeekableInMemoryByteChannel(IOUtils.toByteArray(stream));
+            importableZip = new ZipFile(channel)
+            Enumeration<ZipArchiveEntry> entries = importableZip.getEntries()
+        } finally {
+            if (importableZip) {
+                importableZip.close()
+            }
+        }
+
+        return importableZip
     }
 }
 

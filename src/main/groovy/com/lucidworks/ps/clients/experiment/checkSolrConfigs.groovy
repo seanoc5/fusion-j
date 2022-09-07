@@ -22,19 +22,16 @@ String toolName = this.class.name
 CliBuilder cli = new CliBuilder(usage: "${toolName}.groovy -fhttp://myFusion5addr:6764 -uadmin -psecret123 -s~/data/MyApp.objects.json -m ~/Fusion/migration/F4/mappingFolder", width: 160)
 cli.with {
     h longOpt: 'help', 'Show usage information'
-    f longOpt: 'fusionUrl', args: 1, required: true, 'Fusion url with protocol, host, and port (if any)--for new/migrated app'
-    g longOpt: 'groupLabel', args: 1, required: false, defaultValue: 'TestGroup', 'Label for archiving/grouping objects; app name, environment, project,... freeform and optional'
-    m longOpt: 'mappingDir', args: 1, required: false, 'Folder containing object mapping instructions (subfolders grouped by object type)'
-    p longOpt: 'password', args: 1, required: true, 'password for authentication in fusion cluster (assuming basicAuth for now...)'
-    s longOpt: 'source', args: 1, required: false, 'Source (objects.json or appexport.zip) to read application objects from (old app to be migrated)'
-    t longOpt: 'test', 'Test connection to Fusion (fusionUrl, user, and password)'
-    u longOpt: 'user', args: 1, argName: 'user', required: true, 'the fusion user to authenticate with'
+    f longOpt: 'fusionUrl', args: 1, required: true, argName: 'URL', 'Fusion url with protocol, host, and port (if any) to check solr configs'
+    p longOpt: 'password', args: 1, required: true, argName:'secret', 'password for authentication in fusion cluster (assuming basicAuth for now...)'
+    u longOpt: 'user', args: 1, required: true, argName: 'username', 'the fusion user to authenticate with'
+//    s longOpt: 'source', args: 1, required: false, 'Source (objects.json or appexport.zip) to read application objects from (old app to be migrated)'
+//    t longOpt: 'test', 'Test connection to Fusion (fusionUrl, user, and password)'
     x longOpt: 'exportDir', args: 1, required: false, 'Export directory'
 }
 
 OptionAccessor options = cli.parse(args)
 if (!options) {
-    cli.usage()
     System.exit(-1)
 }
 if (options.help) {
@@ -47,7 +44,7 @@ FusionClient fusionClient = new FusionClient(options)
 log.info "\t\tcheck loading Solr Schema..."
 def solrSchema = fusionClient.getSolrSchema("test")
 def schemaOverview = solrSchema.collect {"${it.key}(${it.value instanceof Collection ? it.value.size() : it.value})"}
-log.info "\t\tgot schema with keys (and size): ${schemaOverview}"
+log.info "\t\tbuilt custom schema overview with keys (and field counts): ${schemaOverview}"
 
 def solrConfigs = fusionClient.getSolrConfigList("test")
 
