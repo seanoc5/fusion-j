@@ -107,7 +107,10 @@ class FusionResponseWrapper {
                 }
             }
         } else {
-            log.warn("Request fialed??) Status: ${this.httpResponse.statusCode()} -- Not a successful request ($httpRequest) -> response:($this.httpResponse)??  --body: ${this.httpResponse?.body()}")
+            String msg = httpResponse.body()
+
+            this.statusMessage = httpResponse.body()
+            log.warn("Request failed??) Status: ${this.httpResponse.statusCode()} -- Not a successful request ($httpRequest) -> response:($this.httpResponse)??  --body: ${this.httpResponse?.body()}")
         }
     }
 
