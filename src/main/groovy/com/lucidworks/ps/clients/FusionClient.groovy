@@ -1083,7 +1083,7 @@ class FusionClient {
      * @param app
      * @return
      */
-    List<Map<String, Object>> getQueryPipelines(def idFilter = null, String app = null) {
+    List<Map<String, Object>> getQueryPipelines(String app = null, def idFilter = null) {
         HttpResponse<String> response = null
         String url = null
         if (app) {
@@ -1261,7 +1261,7 @@ class FusionClient {
      * @param appName
      * @return
      */
-    List<Map<String, Object>> getDataSources(String appName = null) {
+    List<Map<String, Object>> getDataSources(String appName = null, def idFilter = null) {
         HttpResponse<String> response = null
         String url = null
         if (appName) {
@@ -1273,17 +1273,30 @@ class FusionClient {
         }
         HttpRequest request = buildGetRequest(url)
         FusionResponseWrapper responseWrapper = sendFusionRequest(request)
-        return responseWrapper.parsedInfo
+
+        List dsDefs = null
+         if (idFilter) {
+             dsDefs = responseWrapper.parsedList.findAll {
+                 if(idFilter instanceof Pattern) {
+                     it.id ==~ idFilter
+                 } else {
+                     it.id == idFilter
+                 }
+             }
+         } else {
+             dsDefs = responseWrapper.parsedList
+         }
+        return dsDefs
     }
 
-    Map<String, Object> getDataSource(String datasourceId) {
-        HttpResponse<String> response = null
-        String url = "$fusionBase/api/apps/${appName}/connectors/datasources/$datasourceId"
-        log.info "getting datasource (${datasourceId}), url: $url"
-        HttpRequest request = buildGetRequest(url)
-        FusionResponseWrapper responseWrapper = sendFusionRequest(request)
-        return responseWrapper.parsedMap
-    }
+//    Map<String, Object> getDataSource(String datasourceId) {
+//        HttpResponse<String> response = null
+//        String url = "$fusionBase/api/apps/${appName}/connectors/datasources/$datasourceId"
+//        log.info "getting datasource (${datasourceId}), url: $url"
+//        HttpRequest request = buildGetRequest(url)
+//        FusionResponseWrapper responseWrapper = sendFusionRequest(request)
+//        return responseWrapper.parsedMap
+//    }
 
     /**
      * create fusion datasource: $fusionBase/api/apps/${app}/connectors/datasources
@@ -1857,7 +1870,7 @@ class FusionClient {
     }
 
     def blobUpload(String app, String path, String resourceType, def blob) {
-        // {{furl}}//api/apollo/apps/{{app}}/blobs?resourceType=file
+        // {{furl}}//api/apps/{{app}}/blobs?resourceType=file
         //http://lucy:6764/api/apps/test/blobs/lib/test.js/FusionServiceLib.js?resourceType=file
         String url = "$fusionBase/api/apps/${app}/blobs/${path}?resourceType=${resourceType}"
         log.info "\t\t Blob UPLOAD -- path:${path}) type(${resourceType}) blob class name: ${blob.getClass().simpleName}"
@@ -1876,7 +1889,7 @@ class FusionClient {
     List<Map<String, Object>> getBlobDefinitions(String app = '', String resourceType = '', def blobIdFilter = null) {
         String url
         if (app) {
-            url = "${fusionBase}/api/apollo/apps/{{app}}/blobs"
+            url = "${fusionBase}/api/apps/${app}/blobs"
         } else {
             url = "${fusionBase}/api/blobs"
         }
