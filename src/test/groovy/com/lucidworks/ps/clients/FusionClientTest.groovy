@@ -8,16 +8,18 @@ import java.net.http.HttpResponse
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+
 /**
  * Testing fusion client
  * Note: this should be a functional test, not a unit test, refactor as appropriate...
  */
 class FusionClientTest extends Specification {
     // todo -- make this more portable, currently limited to 'my' config, with a test app (F4), and hardcoded object names
-    String appName = 'test'
+    String appName = 'test'         //'Components'
     String qrypName = appName
     String idxpName = appName
     String furl = 'http://newmac:8764'
+//    String furl = 'http://foundry.lucidworksproserve.com:6764'
     FusionClient client = new FusionClient(furl, 'sean', 'pass1234', appName)
 
     def "should successfully buildClient"() {
@@ -51,7 +53,7 @@ class FusionClientTest extends Specification {
         apps instanceof List<Map<String, Object>>
     }
 
-    def "broken - should get all querypipelines in an app"() {
+    def "should get all querypipelines in an app"() {
         when:
         List qrypList = client.getQueryPipelines(appName)
 
@@ -109,11 +111,14 @@ class FusionClientTest extends Specification {
 
     def "broken - should get specific datasource in app"() {
         when:
-        Map qrypDef = client.getDataSource()
+        List dsDefStr = client.getDataSources(appName, 'test')
+        List dsDefPattern = client.getDataSources(appName, ~/t.*t/)
 
         then:
-        qrypDef instanceof Map<String, Object>
-        qrypDef.id == appName
+        dsDefStr instanceof List<Map<String, Object>>
+        dsDefStr.size() == 1
+        dsDefPattern instanceof List<Map<String, Object>>
+        dsDefPattern.size() == 1
     }
 
     def "should get specific datasource WITHOUT app"() {
@@ -126,45 +131,38 @@ class FusionClientTest extends Specification {
         qrypDef.id == appName
     }
 
-    def "should get all blob definitions WITHOUT app"() {
-        when:
-        List<Map<String, Object>> blobDefs = client.getBlobDefinitions()
 
-        then:
-        blobDefs instanceof List<Map<String, Object>>
-        blobDefs.size() > 1
-    }
-
-    def "should get blob definitions WITHOUT app and various filtereing"() {
+    def "should get blob definitions with various filtering"() {
         when:
         List<Map<String, Object>> blobDefsAll = client.getBlobDefinitions()
-        List<Map<String, Object>> blobDefsFile = client.getBlobDefinitions('','file')
-        List<Map<String, Object>> blobDefsSingle = client.getBlobDefinitions('','file', 'aw-firefox.json')
-        List<Map<String, Object>> blobDefsByPattern = client.getBlobDefinitions('','file', ~/(aw-firefox|.*arxiv.*).json/)
+        List<Map<String, Object>> blobDefsApp = client.getBlobDefinitions(appName)
+        List<Map<String, Object>> blobDefsFile = client.getBlobDefinitions('', 'file')
+        List<Map<String, Object>> blobDefsSingle = client.getBlobDefinitions('', 'file', 'quickstart/arxiv-fusion.json')
+        List<Map<String, Object>> blobDefsByPattern = client.getBlobDefinitions('', 'file', ~/(.*Liquor.*|.*arxiv.*)\.(json|csv)/)
 
         then:
         blobDefsAll instanceof List<Map<String, Object>>
         blobDefsAll.size() > blobDefsFile.size()
-        blobDefsSingle.size()==1
-        blobDefsByPattern.size()==2
+        blobDefsSingle.size() == 1
+        blobDefsByPattern.size() == 2
     }
 
     def "should get single text blob WITHOUT app"() {
         when:
-        def blobFF = client.getBlob('sampleLocations.csv')
+        def blobFF = client.getBlob('')
 
         then:
         blobFF
     }
 
     // todo -- fix this -- add more logic for processing and testing binary blobs -- currently fails
-    def "broken - should get binary text blob nlp/models/en-chunker.bin"() {
+    def "should get binary text blob nlp/models/en-chunker.bin"() {
         when:
         HttpResponse.BodyHandler bodyHandler = HttpResponse.BodyHandlers.ofInputStream()
-        def blobFF = client.getBlob('nlp/models/en-chunker.bin', bodyHandler)
+        def blobNlp = client.getBlob('nlp/models/en-chunker.bin', bodyHandler)
 
         then:
-        blobFF
+        blobNlp
     }
 
 
