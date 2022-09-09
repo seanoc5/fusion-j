@@ -1,14 +1,18 @@
 package com.lucidworks.ps.clients
 
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry
+import org.apache.commons.compress.archivers.zip.ZipArchiveInputStream
+import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream
 import org.apache.commons.compress.archivers.zip.ZipFile
+import org.apache.commons.compress.utils.SeekableInMemoryByteChannel
 import spock.lang.Specification
 
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.nio.channels.SeekableByteChannel
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
-
 /**
  * Testing fusion client
  * Note: this should be a functional test, not a unit test, refactor as appropriate...
@@ -157,12 +161,49 @@ class FusionClientTest extends Specification {
 
     // todo -- fix this -- add more logic for processing and testing binary blobs -- currently fails
     def "should get binary text blob nlp/models/en-chunker.bin"() {
+        given:
+        String chunkerName = 'chunker.model'
+
         when:
         HttpResponse.BodyHandler bodyHandler = HttpResponse.BodyHandlers.ofInputStream()
-        def blobNlp = client.getBlob('nlp/models/en-chunker.bin', bodyHandler)
+        def blobZipDownload = client.getBlob('nlp/models/en-chunker.bin', bodyHandler)
+
+//        ZipArchiveEntry entry = null;
+//           while ((entry = blobZipDownload.) != null) {
+//               if (!i.canReadEntryData(entry)) {
+//                   // log something?
+//                   continue;
+//               }
+//        def entries = blobZipDownload.entries
+        def chunker = blobZipDownload.getEntry(chunkerName)
+        def manifestEntry = blobZipDownload.getEntry('manifest.properties')
+
+        InputStream inputStream = blobZipDownload.getInputStream(manifestEntry)
+        int i = inputStream.read()
+//        def inputStream = blobZipDownload.get(manifestEntry)
+        def manifestStream = new ZipArchiveInputStream(inputStream)
+        byte[] mfbytes = new byte[manifestEntry.getSize()]
+//        IOUtils.copy(manifestStream, mfbytes)
+
+        byte[] inputData; // zip archive contents
+//        SeekableInMemoryByteChannel inMemoryByteChannel = new SeekableInMemoryByteChannel();
+//        ZipFile zipFile = new ZipFile(inMemoryByteChannel);
+//        ZipArchiveEntry archiveEntry = zipFile.getEntry("entryName");
+//        InputStream inputStream = zipFile.getInputStream(archiveEntry);
+//        inputStream.read() // read data from the input stream
+
+        def myBytes = manifestStream.readAllBytes()
+        String mfText = mfbytes.toString()
+//        IOUtils.
 
         then:
-        blobNlp
+        blobZipDownload instanceof ZipFile
+        chunker.size > 0
+        chunker.name == chunkerName
+        chunker instanceof ZipArchiveEntry
+
+
+
     }
 
 
@@ -298,5 +339,35 @@ class FusionClientTest extends Specification {
 
         filteredAppMainColl.size() == 1
         filteredAppMainColl[0].id == singleCollection.id
+    }
+
+    def "create importable zip file"() {
+        given:
+        File outFile = File.createTempFile("spock-test-importableBundle", ".zip")
+        Map objectsMap = [
+                objects   : [datasources: ['test']],
+                metadata  : ["formatVersion": "1", "exportedBy": "admin", "fusionVersion": "4.2.6",],
+                properties: ['var 1']
+        ]
+        def foo = new File(getClass().getResource('/blobs/stopwords/large_stopwords_en.txt').toURI())
+        def blobUrl = getClass().getResource('/blobs/stopwords/large_stopwords_en.txt')
+        Map blobsMap = ['test/large_stopwords_en':blobUrl]
+        FusionResponseWrapper frw = client.exportFusionObjects('collection.ids=test')
+
+        when:
+        def myzip = client.createImportableZipArchive(outFile.newOutputStream(), objectsMap, blobsMap)
+
+        then:
+        outFile.exists()
+        outFile.size() > 0
+        outFile.name.endsWith('.zip')
+    }
+
+    def "exportSolrConfigset with SeekableByteChannel channel"(){
+        given:
+        SeekableByteChannel channel = new SeekableInMemoryByteChannel()
+        ZipArchiveOutputStream zaos = new ZipArchiveOutputStream(channel)
+//        HttpResponse.BodyHandler bodyHandler =
+
     }
 }
