@@ -5,19 +5,26 @@ import com.lucidworks.ps.model.fusion.Application
 import com.lucidworks.ps.solr.SolrConfigThing
 import groovy.cli.picocli.OptionAccessor
 import groovy.json.JsonBuilder
+import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
+import org.apache.commons.io.IOUtils
 import org.apache.http.auth.AuthenticationException
+
+//import org.apache.commons.compress.utils.IOUtils
+
 import org.apache.http.client.utils.URIBuilder
 import org.apache.log4j.Logger
+import org.apache.tools.zip.ZipEntry
+import org.apache.tools.zip.ZipOutputStream
 
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.net.http.HttpResponse.BodyHandler
+import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 import java.time.Duration
 import java.util.regex.Pattern
-
 /**
  * attempt to replicate solrj client-ness for fusion
  * using cookies and session api to start with
@@ -940,7 +947,7 @@ class FusionClient {
         List collections = getCollectionDefinitions(appId, idFilter)
         if (collections) {
             Map collection = collections[0]
-            if (collections.size() ==1) {
+            if (collections.size() == 1) {
                 log.info "\t\tFound a single collection (as expected), return it (as a map) rather than the single-element list... (${collection.id}}"
             } else {
                 String msg = "More than one collection returned (${collections.size()} :: ${collections.collect { it.id }})"
@@ -953,6 +960,16 @@ class FusionClient {
             log.warn "Could not find collection ($idFilter) in App ($appId), returning null..."
             return null
         }
+    }
+
+
+    /**
+     * convenience wrapper to get configset(s?) zip file
+     * @param configsetId
+     * @param bodyHandler
+     */
+    def exportSolrConfigset(String configsetId, bodyHandler){
+        def configsetZip = exportFusionObjects("collection.ids=$configsetId", bodyHandler)
     }
 
 
@@ -1056,8 +1073,12 @@ class FusionClient {
         return responseWrapper.parsedInfo
     }
 
-/*
-// move to getIndexPipelines with idFilter....
+    /**
+     * get single pipeline definition
+     * @param pipelineId
+     * @param app
+     * @return
+     */
     Map<String, Object> getIndexPipeline(String pipelineId, String app = null) {
         HttpResponse<String> response = null
         String url = null
@@ -1072,10 +1093,9 @@ class FusionClient {
         log.info "\t get index pipeline ($pipelineId) for url: $url "
         HttpRequest request = buildGetRequest(url)
         FusionResponseWrapper responseWrapper = sendFusionRequest(request)
-
-        return responseWrapper.parsedMap
+        Map idxpDef = responseWrapper.parsedMap
+        return idxpDef
     }
-*/
 
 
     /**
@@ -1275,17 +1295,17 @@ class FusionClient {
         FusionResponseWrapper responseWrapper = sendFusionRequest(request)
 
         List dsDefs = null
-         if (idFilter) {
-             dsDefs = responseWrapper.parsedList.findAll {
-                 if(idFilter instanceof Pattern) {
-                     it.id ==~ idFilter
-                 } else {
-                     it.id == idFilter
-                 }
-             }
-         } else {
-             dsDefs = responseWrapper.parsedList
-         }
+        if (idFilter) {
+            dsDefs = responseWrapper.parsedList.findAll {
+                if (idFilter instanceof Pattern) {
+                    it.id ==~ idFilter
+                } else {
+                    it.id == idFilter
+                }
+            }
+        } else {
+            dsDefs = responseWrapper.parsedList
+        }
         return dsDefs
     }
 
@@ -1845,7 +1865,7 @@ class FusionClient {
      * use fusion passthrough api to get "combined" schema from Solr (includes overlay.json....)
      * url format: {{furl}}/api/solr/{{coll}}/schema
      * @param collectionName
-     * @param params, e.g. action: LISt and
+     * @param params , e.g. action: LISt and
      * @return
      */
     def getSolrSchema(String collectionName, Map<String, String> params = [action: 'LIST', wt: 'json']) {
@@ -1922,7 +1942,7 @@ class FusionClient {
      */
     def getBlob(String blobId, BodyHandler bodyHandler = HttpResponse.BodyHandlers.ofString()) {
         String url = "${fusionBase}/api/blobs/${blobId}"
-        log.info "\t\t Get blob thing with id: $blobId"
+        log.info "\t\t Get blob thing with id: $blobId -- body handler: $bodyHandler"
         HttpRequest request = buildGetRequest(url)
         FusionResponseWrapper fusionResponseWrapper = sendFusionRequest(request, bodyHandler)
         def blob = fusionResponseWrapper.parsedInfo
@@ -1949,5 +1969,74 @@ class FusionClient {
             }
             return majorVersion
         }
+    }
+
+
+    /**
+     *  accept inputs to create a zip file archive that can be imported into Fusion
+     *  typically need:
+     *      objects.json (with metadata and Fusion version),
+     *      (optional) blob things (often a file folder with objects to upload)
+     *      (optional) configsets for solr collections
+     * @param objectsJson
+     * @param blobThings
+     * @param configsetThings
+     */
+    def createImportableZipArchive(OutputStream outputStream, Map objectsJson, Map<String, Object> blobThings = [:], Map<String, Object> configsetThings = [:]) {
+
+//        File outFile = File.createTempFile("TA-java-util", ".zip")
+//        println("Temp outfile: ${outFile.absolutePath}")
+
+        ZipOutputStream zipOutputStream = new ZipOutputStream(outputStream)
+        String json = JsonOutput.toJson(objectsJson)
+        String prettyJson = JsonOutput.prettyPrint(json)
+        log.info "Add objects.json with keys: ${objectsJson.keySet()}"
+        ZipEntry objectsJsonEntry = new ZipEntry('objects.json')
+        zipOutputStream.putNextEntry(objectsJsonEntry)
+        InputStream iois = IOUtils.toInputStream(prettyJson, StandardCharsets.UTF_8)
+        // NOTE: IO utils has this method, but the one from Compress does not -- beware!
+        IOUtils.copy(iois, zipOutputStream)
+
+        blobThings.each { String namePath, Object blobItem ->
+            String s = "/blobs/" + namePath
+            log.info "Add blob: (${s} --> $blobItem"
+            ZipEntry e = new ZipEntry(s)
+            zipOutputStream.putNextEntry(e)
+
+            InputStream inputStream = getInputStream(blobItem)
+            IOUtils.copy(inputStream, zipOutputStream)
+//            byte[] data = blobItem.getBytes()
+//            zipOutputStream.write(data, 0, data.length)
+        }
+
+        configsetThings.each { namePath, thing ->
+            String s = "/configset/" + namePath
+            log.info "Add config thing: (${s}) --> $thing"
+            ZipEntry e = new ZipEntry(namePath)
+            zipOutputStream.putNextEntry(e)
+
+            InputStream inputStream = getInputStream(thing)
+            IOUtils.copy(inputStream, zipOutputStream)
+        }
+        zipOutputStream.close()
+
+        return zipOutputStream
+    }
+
+    InputStream getInputStream(Object o) {
+        InputStream inputStream = null
+        if (o instanceof URL) {
+            // https://stackoverflow.com/questions/6932369/inputstream-from-a-url
+            inputStream = ((URL) o).openStream()
+        } else if (o instanceof File) {
+            inputStream = ((File) o).newInputStream()
+        } else if (o instanceof String) {
+            inputStream = IOUtils.toInputStream(o, StandardCharsets.UTF_8)
+//        } else if(o instanceof File){
+//            inputStream = ((File)o).newInputStream()
+        } else {
+            log.warn "Unknown blob object type: ${o.class.name}"
+        }
+        return inputStream
     }
 }
