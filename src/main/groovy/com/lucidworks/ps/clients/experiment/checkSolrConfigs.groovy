@@ -58,3 +58,4 @@ log.info "\t\tusing temp file: ${tempPath.toAbsolutePath()}"
 
 //log.info "Get Objects"
 def objects = fusionClient.getObjects("", bodyHandler)
+log.info "Objects:...."
