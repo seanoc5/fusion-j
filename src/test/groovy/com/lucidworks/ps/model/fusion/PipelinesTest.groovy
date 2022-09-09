@@ -19,7 +19,7 @@ class PipelinesTest extends Specification {
 
         then:
         pipelineWrapper.srcItems.size()==1
-
+        pipelineWrapper.srcItems[0].id == 'testIdxPipeline'
 
     }
 }
