@@ -9,10 +9,10 @@ import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
 import org.apache.commons.io.IOUtils
 import org.apache.http.auth.AuthenticationException
+import org.apache.http.client.utils.URIBuilder
 
 //import org.apache.commons.compress.utils.IOUtils
 
-import org.apache.http.client.utils.URIBuilder
 import org.apache.log4j.Logger
 import org.apache.tools.zip.ZipEntry
 import org.apache.tools.zip.ZipOutputStream
@@ -23,6 +23,8 @@ import java.net.http.HttpResponse
 import java.net.http.HttpResponse.BodyHandler
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
+import java.text.DateFormat
+import java.text.SimpleDateFormat
 import java.time.Duration
 import java.util.regex.Pattern
 /**
@@ -968,7 +970,7 @@ class FusionClient {
      * @param configsetId
      * @param bodyHandler
      */
-    def exportSolrConfigset(String configsetId, bodyHandler){
+    def exportSolrConfigset(String configsetId, bodyHandler) {
         def configsetZip = exportFusionObjects("collection.ids=$configsetId", bodyHandler)
     }
 
@@ -1125,20 +1127,20 @@ class FusionClient {
         }
     }
 
-    Object getQueryPipeline(String qryPipelineId, String app = null) {
+    Map<String, Object> getQueryPipeline(String qryPipelineId, String app = null) {
         HttpResponse<String> response = null
         String url = null
         if (app) {
             url = "$fusionBase/api/apps/${app}/query-pipelines/$qryPipelineId"
         } else {
             url = "$fusionBase/api/query-pipelines/$qryPipelineId"
-            log.info "No app given, getting all query pipelines..."
+            log.debug "No app given, getting query pipeline without app context (not a problem, just FYI)"
         }
         log.info "\t list query pipelines for url: $url "
         HttpRequest request = buildGetRequest(url)
         FusionResponseWrapper responseWrapper = sendFusionRequest(request)
-
-        return responseWrapper.parsedInfo
+        Map<String, Object> pipeline = responseWrapper.parsedInfo
+        return pipeline
     }
 
     /**
@@ -1983,11 +1985,8 @@ class FusionClient {
      * @param configsetThings
      */
     def createImportableZipArchive(OutputStream outputStream, Map objectsJson, Map<String, Object> blobThings = [:], Map<String, Object> configsetThings = [:]) {
-
-//        File outFile = File.createTempFile("TA-java-util", ".zip")
-//        println("Temp outfile: ${outFile.absolutePath}")
-
         ZipOutputStream zipOutputStream = new ZipOutputStream(outputStream)
+        def metadata = objectsJson.metadata
         String json = JsonOutput.toJson(objectsJson)
         String prettyJson = JsonOutput.prettyPrint(json)
         log.info "Add objects.json with keys: ${objectsJson.keySet()}"
@@ -2018,10 +2017,24 @@ class FusionClient {
             InputStream inputStream = getInputStream(thing)
             IOUtils.copy(inputStream, zipOutputStream)
         }
+        log.info "\t\tClose ZipOutputStream: $zipOutputStream"
         zipOutputStream.close()
 
         return zipOutputStream
     }
+
+    def setObjectsMetadata(Map metadata, String fusionVersion, String fusionGuid, String exportedBy = 'FusionJClient') {
+        metadata.exportedBy = exportedBy
+        metadata.formatVersion = "1"
+        Date now = new Date()
+//        DateFormat dateFormat = new SimpleDateFormat('yyyy-MM-dd.hh.mm')
+        DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm'Z'");
+        String expDate = now.toInstant()
+        metadata.exportedDate = expDate
+        metadata.fusionVersion = fusionVersion
+        metadata.fusionGuid = fusionGuid
+    }
+
 
     InputStream getInputStream(Object o) {
         InputStream inputStream = null
@@ -2039,4 +2052,5 @@ class FusionClient {
         }
         return inputStream
     }
+
 }
