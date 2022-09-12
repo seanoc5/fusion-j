@@ -36,3 +36,8 @@ notes:
   * verify access??
   * solr_base_url?
   * 
+
+
+
+# NOTE: Fusion 4.1.x 
+Objects.json might be different structure, and may need processing changes
