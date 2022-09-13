@@ -10,10 +10,10 @@ import groovy.json.JsonSlurper
 import org.apache.commons.io.IOUtils
 import org.apache.http.auth.AuthenticationException
 import org.apache.http.client.utils.URIBuilder
+import org.apache.log4j.Logger
 
 //import org.apache.commons.compress.utils.IOUtils
 
-import org.apache.log4j.Logger
 import org.apache.tools.zip.ZipEntry
 import org.apache.tools.zip.ZipOutputStream
 
@@ -23,8 +23,6 @@ import java.net.http.HttpResponse
 import java.net.http.HttpResponse.BodyHandler
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
-import java.text.DateFormat
-import java.text.SimpleDateFormat
 import java.time.Duration
 import java.util.regex.Pattern
 /**
@@ -2023,16 +2021,23 @@ class FusionClient {
         return zipOutputStream
     }
 
-    def setObjectsMetadata(Map metadata, String fusionVersion, String fusionGuid, String exportedBy = 'FusionJClient') {
+
+    /**
+     * helper method to populate a map with fusion export zip metadata (the fusionVersion element is the most important)
+     * @param metadata
+     * @param fusionVersion
+     * @param fusionGuid
+     * @param exportedBy
+     * @return map with expected metadata values
+     */
+    Map<String, Object> createtObjectsMetadata(String fusionVersion, String fusionGuid, String exportedBy = 'FusionJClient') {
+        Map metadata = [:]
         metadata.exportedBy = exportedBy
         metadata.formatVersion = "1"
-        Date now = new Date()
-//        DateFormat dateFormat = new SimpleDateFormat('yyyy-MM-dd.hh.mm')
-        DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm'Z'");
-        String expDate = now.toInstant()
-        metadata.exportedDate = expDate
+        metadata.exportedDate = new Date().toInstant().toString()
         metadata.fusionVersion = fusionVersion
         metadata.fusionGuid = fusionGuid
+        return metadata
     }
 
 
