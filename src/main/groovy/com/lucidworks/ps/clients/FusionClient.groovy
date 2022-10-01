@@ -184,7 +184,7 @@ class FusionClient {
         String urlSession = "${baseUrl}/api/session"
         log.info "\t\tInitializing Fusion client session via POST to session url: $urlSession"
 
-        try {
+//        try {
             HttpRequest request = buildPostRequest(urlSession, authJson)
             BodyHandler<String> handler = HttpResponse.BodyHandlers.ofString()
             HttpResponse<String> response = client.send(request, handler)
@@ -196,15 +196,19 @@ class FusionClient {
                 cookieMS = System.currentTimeMillis()
                 Date ts = new Date(cookieMS)
                 log.debug("\tSession cookie: ${this.sessionCookie} set/refreshed at timestamp: $cookieMS (${ts})")
-            } else {
-                log.error "Bad status code creating client (incorrect auth??), Status Code: ${response.statusCode()} -- body: ${response.body()}"
+            } else if(response.statusCode()==401){
+                log.error "Error code 401 creating client (incorrect auth??), Status Code: ${response.statusCode()} -- body: ${response.body()}"
                 throw new AuthenticationException("Could not create Fusion Client (${response.body()})")
+
+            } else {
+                log.error "Bad status code creating client -- Status Code: ${response.statusCode()} -- body: ${response.body()}"
+                throw new IllegalArgumentException("Could not create Fusion Client -- response code:(${response.statusCode()}) -- body:(${response.body()})")
             }
-        } catch (Exception e) {
-            log.warn "Problem getting client: $e"
-            client = null
-            throw new IllegalArgumentException("Could not get valid client with session call, bailing by rethrowing error")
-        }
+//        } catch (Exception e) {
+//            log.warn "Problem getting client: $e"
+//            client = null
+//            throw new IllegalArgumentException("Could not get valid client with session call, bailing by rethrowing error")
+//        }
 
         this.httpClient = client
         def info = getFusionInformation()
