@@ -23,7 +23,7 @@ class FusionClientArgParser {
 //            g longOpt: 'groupLabel', args: 1, required: false, argName: 'group', defaultValue: 'TestGroup', 'Label for archiving/grouping objects; app name, environment, project,... freeform and optional'
 //            m longOpt: 'mappingDir', args: 1, required: false, argName: 'dir', 'Folder containing object mapping instructions (subfolders grouped by object type)'
             p longOpt: 'password', args: 1, required: true, argName: 'passwrd', 'password for authentication in fusion cluster (assuming basicAuth for now...) for MAIN/dest fusion'
-            s longOpt: 'source', args: 1, required: false, argName: 'sourceFile', 'Source (objects.json or appexport.zip) to read application objects from (old app to be migrated)'
+            s longOpt: 'source', args: 1, required: false, type:File, argName: 'sourceFile', 'Source (objects.json or appexport.zip) to read application objects from (old app to be migrated)'
             u longOpt: 'user', args: 1, argName: 'user', required: true, 'the fusion user to authenticate with for MAIN/dest fusion'
             x longOpt: 'exportDir', args: 1, required: false, argName: 'dir', 'Export directory'
 
