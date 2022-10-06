@@ -990,7 +990,7 @@ class FusionClient {
         String collName = collectionMap.id
         JsonBuilder jsonBuilder = new JsonBuilder(collectionMap)
         String jsonToIndex = jsonBuilder.toString()
-        log.warn "Revisit collection creation process, this call is doing a naive/vanilla collection creation: $jsonToIndex"
+        log.debug "Revisit collection creation process, this call is doing a naive/vanilla collection creation: $jsonToIndex"
         try {
             String url = "$fusionBase/api/apps/${appName}/collections"      // todo: add defaultFeatures?
 //            String url = "$fusionBase/api/apps/${appName}/collections/${collectionName}"      // todo: add defaultFeatures?
@@ -998,7 +998,7 @@ class FusionClient {
 //            HttpRequest request = buildPutRequest(url, jsonToIndex)
             HttpRequest request = buildPostRequest(url, jsonToIndex)
             responseWrapper = sendFusionRequest(request)
-            log.info "\t\tcreate collection respose: $responseWrapper"
+            log.debug "\t\tcreate collection respose: $responseWrapper"
         } catch (IllegalArgumentException iae) {
             log.error "IllegalArgumentException: $iae"
         }
@@ -1551,8 +1551,10 @@ class FusionClient {
         List<FusionResponseWrapper> responses = []
         List<Map<String, Object>> existingCollections = getCollectionDefinitions(appName)
 
+
         // --------------- Create Collections ------------------
-        srcFusionObjects['collections'].each { Map<String, Object> coll ->
+        def collectionsToCreate = srcFusionObjects['collections'].findAll {it.type == 'DATA'}
+        collectionsToCreate.each { Map<String, Object> coll ->
             String newCollname = coll.id
             def existingColl = existingCollections.find { it.id == newCollname }
             if (existingColl) {
@@ -1562,7 +1564,7 @@ class FusionClient {
                 boolean defaultFeatures = false
                 FusionResponseWrapper responseWrapper = createCollection(newCollname, coll, appName, defaultFeatures)
                 if (responseWrapper.wasSuccess()) {
-                    log.debug "\t\tCreated Collection: ($coll)"
+                    log.info "\t\tCreated Collection: ($coll)"
                 } else {
                     log.warn "Had a problem creating collection: $coll??? Response wrapper: $responseWrapper"
                 }
