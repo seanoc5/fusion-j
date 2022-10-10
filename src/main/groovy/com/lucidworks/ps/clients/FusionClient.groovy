@@ -9,12 +9,15 @@ import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
 import org.apache.commons.io.IOUtils
 import org.apache.http.auth.AuthenticationException
+
+//import org.apache.commons.io.IOUtils
+
 import org.apache.http.client.utils.URIBuilder
 import org.apache.log4j.Logger
+import org.apache.tools.zip.ZipEntry
 
 //import org.apache.commons.compress.utils.IOUtils
 
-import org.apache.tools.zip.ZipEntry
 import org.apache.tools.zip.ZipOutputStream
 
 import java.net.http.HttpClient
@@ -25,6 +28,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 import java.time.Duration
 import java.util.regex.Pattern
+
 /**
  * attempt to replicate solrj client-ness for fusion
  * using cookies and session api to start with
