@@ -191,15 +191,15 @@ class FusionResponseWrapper {
                 type = 'schedules'
                 break
 
-            case ~/link/:
+            case ~/.*link/:
                 type = 'link'
                 break
 
-            case ~/api\/apps.*collections/:
+            case ~/.*api\/apps.*collections/:
                 type = 'collections'
                 break
 
-            case ~/parsers/:
+            case ~/.*parsers/:
                 type = 'parsers'
                 break
 
