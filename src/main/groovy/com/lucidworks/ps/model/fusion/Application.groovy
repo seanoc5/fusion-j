@@ -184,6 +184,18 @@ class Application extends BaseObject {
         return null
     }
 
+    def transform(def thingsToTransform, def transformRules){
+        Map<String, Object> resultsMap = [:]
+        thingsToTransform.each { thingType ->
+            String msg = "Transform fusion app thing: $thingType"
+            log.info msg
+            def fusionObjectWrapper = this.getThings(thingType)
+            def results = fusionObjectWrapper.tr
+            // todo -- add actual code and real results here, WIP
+            resultsMap[thingType] = msg
+        }
+        return resultsMap
+    }
 
     public Map<String, Object> parseAppMetadata(Map<String, Object> parsedMap) {
         Map parsedMetadata = [:]
