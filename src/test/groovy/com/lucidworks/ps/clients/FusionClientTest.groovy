@@ -16,6 +16,7 @@ import java.nio.file.Paths
 /**
  * Testing fusion client
  * Note: this should be a functional test, not a unit test, refactor as appropriate...
+ * <b>NOTE:</b> set environment variables for connection to running fusion (4 or 5): fuser, fpass, furl
  */
 class FusionClientTest extends Specification {
     // NOTE: this breaks best practice for unit tests, but we are pulling connection info from the environment, so set these values in the system env variables when running these tests, otherwise expect them to fail...
@@ -124,6 +125,7 @@ class FusionClientTest extends Specification {
 
     def "broken - should get specific datasource in app"() {
         when:
+        List dsAll = client.getDataSources()
         List dsDefStr = client.getDataSources(appName, 'test')
         List dsDefPattern = client.getDataSources(appName, ~/t.*t/)
 
