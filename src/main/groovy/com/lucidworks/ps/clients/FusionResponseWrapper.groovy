@@ -108,6 +108,10 @@ class FusionResponseWrapper {
             }
         } else {
             String msg = httpResponse.body()
+            if(isJson(msg)){
+                def jsonMsg = new JsonSlurper().parseText(msg)
+                log.info "Json parsed message: $jsonMsg"
+            }
             this.statusMessage = httpResponse.body()
             log.warn("Request failed??) Status: ${this.httpResponse.statusCode()} -- Not a successful request ($httpRequest) -> response:($this.httpResponse)?? ")
             log.debug "Failed request  --body: ${this.httpResponse?.body()}"

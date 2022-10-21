@@ -60,7 +60,7 @@ class FusionClient {
     File exportDirectory = null
     String objectsGroup = null
     Map introspectInfo = null
-    Map apiInfo = null
+    Map<String, Object> apiInfo = null
     Long cookieMS = null
     long MAX_COOKIE_AGE_MS = 1000 * 60 * 15
     // starting with default of 15 minutes for cookie age?   todo -- revisit, make this more accessible
@@ -75,6 +75,44 @@ class FusionClient {
      */
     FusionClient(String baseUrl, String user, String pass, String app = null) {
         this(new URL(baseUrl), user, pass, app)
+    }
+
+    FusionClient() {
+        def envVars = System.getenv()
+        this.user = envVars.fuser
+        this.password = envVars.fpass
+
+        String furl = envVars.furl
+        if(furl && this.user && this.password) {
+            if (furl.endsWith('/')) {
+                furl = furl[0..-2]
+                log.info "\t\tstripping trailing slash from baseUrl: '$furl' => '${fusionBase}'"
+            }
+            this.fusionBase = new URL(furl)
+
+            log.info "FusionClient constructor from System.getenv(): fusionBase:($fusionBase), user:($user), password?(${password > ''}) )..."
+
+            if (envVars.fapp) {
+                appName = envVars.fapp
+                log.info "\t\tSetting app: $appName"
+            }
+
+            if(envVars.exportDir){
+                String dir =  envVars.exportDir
+                exportDirectory = new File(dir)
+                if(exportDirectory.exists()){
+                    log.debug "export dir exists: $exportDirectory"
+                } else {
+                    Helper.getOrMakeDirectory(exportDirectory)
+                    log.info "export dir ($exportDirectory) did not exist, does it now? ${exportDirectory.exists()}"
+                }
+
+                log.info "\t\tsetting export dir from env variable (exportDir): $dir -> $exportDirectory"
+            }
+            httpClient = buildClient(fusionBase, user, password)
+        } else {
+            log.warn "Missing critical constructor information: url:(${this.fusionBase}), user:(${this.user}), password:(${password > ''}) -- likely there will be problems...?"
+        }
     }
 
 
@@ -174,7 +212,7 @@ class FusionClient {
      * @return
      */
     HttpClient buildClient(String baseUrl, String user, String pass) {
-        log.info "\t\t${this.class.simpleName} getClient(baseurl: $baseUrl, user:$user, password <hidden>...)   [should only need to call this once...]"
+        log.debug "\t\t${this.class.simpleName} getClient(baseurl: $baseUrl, user:$user, password <hidden>...)   [should only need to call this once...]"
         HttpClient client = HttpClient.newBuilder()
                 .cookieHandler(new CookieManager())
                 .version(HttpClient.Version.HTTP_1_1)
@@ -186,36 +224,32 @@ class FusionClient {
         // start a session for this client to use
         // todo -- check for stale cookies, etc
         String urlSession = "${baseUrl}/api/session"
-        log.info "\t\tInitializing Fusion client session via POST to session url: $urlSession"
+        log.debug "\t\tInitializing Fusion client session via POST to session url: $urlSession"
 
-//        try {
-            HttpRequest request = buildPostRequest(urlSession, authJson)
-            BodyHandler<String> handler = HttpResponse.BodyHandlers.ofString()
-            HttpResponse<String> response = client.send(request, handler)
-            FusionResponseWrapper fusionResponseWrapper = new FusionResponseWrapper(request, response, handler)
-            responses << fusionResponseWrapper
-            if (response.statusCode() < 300) {
-                log.debug("\t\tResponse status: " + response.statusCode())
-                sessionCookie = response.headers().firstValue("set-cookie")
-                cookieMS = System.currentTimeMillis()
-                Date ts = new Date(cookieMS)
-                log.debug("\tSession cookie: ${this.sessionCookie} set/refreshed at timestamp: $cookieMS (${ts})")
-            } else if(response.statusCode()==401){
-                log.error "Error code 401 creating client (incorrect auth??), Status Code: ${response.statusCode()} -- body: ${response.body()}"
-                throw new AuthenticationException("Could not create Fusion Client (${response.body()})")
+        HttpRequest request = buildPostRequest(urlSession, authJson)
+        BodyHandler<String> handler = HttpResponse.BodyHandlers.ofString()
+        HttpResponse<String> response = client.send(request, handler)
+        FusionResponseWrapper fusionResponseWrapper = new FusionResponseWrapper(request, response, handler)
+        responses << fusionResponseWrapper
+        if (response.statusCode() < 300) {
+            log.debug("\t\tResponse status: " + response.statusCode())
+            sessionCookie = response.headers().firstValue("set-cookie")
+            cookieMS = System.currentTimeMillis()
+            Date ts = new Date(cookieMS)
+            log.info("FusionClient.buildClient() successfully created session (url:$urlSession) with cookie set/refreshed at (${ts}) -- user:($user)")
+            log.debug("\t\tcookie: ${this.sessionCookie} set/refreshed at timestamp: $cookieMS (${ts}) -- user:($user)")
+        } else if (response.statusCode() == 401) {
+            log.error "Error code 401 creating client (incorrect auth??), Status Code: ${response.statusCode()} -- body: ${response.body()}"
+            throw new AuthenticationException("Could not create Fusion Client (${response.body()})")
 
-            } else {
-                log.error "Bad status code creating client -- Status Code: ${response.statusCode()} -- body: ${response.body()}"
-                throw new IllegalArgumentException("Could not create Fusion Client -- response code:(${response.statusCode()}) -- body:(${response.body()})")
-            }
-//        } catch (Exception e) {
-//            log.warn "Problem getting client: $e"
-//            client = null
-//            throw new IllegalArgumentException("Could not get valid client with session call, bailing by rethrowing error")
-//        }
+        } else {
+            log.error "Bad status code creating client -- Status Code: ${response.statusCode()} -- body: ${response.body()}"
+            throw new IllegalArgumentException("Could not create Fusion Client -- response code:(${response.statusCode()}) -- body:(${response.body()})")
+        }
 
         this.httpClient = client
-        def info = getFusionInformation()
+        Map info = getFusionInformation()
+        log.debug "Fusion information: $info"
 
         // todo -- revisit returning the client, versus setting it above; doing both because I feel getting fusion info/version is part of building the client and general awareness (different urls between different fusions
         return client
@@ -268,7 +302,6 @@ class FusionClient {
                     .PUT(HttpRequest.BodyPublishers.ofFile(uploadPath))
                     .build()
             log.info "Upload file: ${uploadPath.toAbsolutePath()}"
-
 
         } else if (payload instanceof Map || payload instanceof Collection) {
             JsonBuilder jsonBuilder = new JsonBuilder(payload)
@@ -384,9 +417,9 @@ class FusionClient {
     /**
      * trying to get general information, primarily fusion version, so we can adjust api syntax accordingly
      *
-     * @return
+     * @return map of string and values for Fusion info
      */
-    def getFusionInformation() {
+    Map<String, Object> getFusionInformation() {
         String url = "$fusionBase/api"
         JsonSlurper jsonSlurper = new JsonSlurper()
         HttpRequest request = buildGetRequest(url)
@@ -893,6 +926,9 @@ class FusionClient {
         responses << fusionResponse // add this response to the client's collection of responses
         if (fusionResponse.wasSuccess()) {
             log.debug "successful request/response: $fusionResponse"
+            if (exportDirectory) {
+                log.info "\t\tExport (sucessful) request/response to folder: $exportDirectory..."
+            }
         } else {
             log.warn "UNSUCCESSFUL request/response: $fusionResponse"
             String body = response.body()
@@ -908,6 +944,10 @@ class FusionClient {
                         fusionResponse.statusMessage = json.toString()
                     }
                 }
+                if (exportDirectory) {
+                    log.info "\t\tExport (failed) request/response to folder: $exportDirectory..."
+                }
+
             } else {
                 log.warn "Response body was not Json!! + $body"
             }
@@ -1557,7 +1597,7 @@ class FusionClient {
 
 
         // --------------- Create Collections ------------------
-        def collectionsToCreate = srcFusionObjects['collections'].findAll {it.type == 'DATA'}
+        def collectionsToCreate = srcFusionObjects['collections'].findAll { it.type == 'DATA' }
         collectionsToCreate.each { Map<String, Object> coll ->
             String newCollname = coll.id
             def existingColl = existingCollections.find { it.id == newCollname }

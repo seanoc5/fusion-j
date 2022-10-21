@@ -21,15 +21,16 @@ import java.nio.file.Paths
 class FusionClientTest extends Specification {
     // NOTE: this breaks best practice for unit tests, but we are pulling connection info from the environment, so set these values in the system env variables when running these tests, otherwise expect them to fail...
     Map<String, String> env = System.getenv()
-    String furl = env.furl ?: 'http://localhost:8764'
+//    String furl = env.furl ?: 'http://localhost:8764'
 //    String furl = env.furl ?: 'http://foundry.lucidworksproserve.com:6764'
-    String fuser = env.fuser ?: 'admin'
-    String fpass = env.fpass ?: 'password123'
+//    String fuser = env.fuser ?: 'admin'
+//    String fpass = env.fpass ?: 'password123'
 //    String qryp = env.qryp ?: 'Components_TYPEAHEAD_DW_QPL_v4'
-    FusionClient client = new FusionClient(furl, fuser, fpass)
+//    FusionClient client = new FusionClient(furl, fuser, fpass)
+    FusionClient client = new FusionClient()
 
     // todo -- make this more portable, currently limited to 'my' config, with a test app (F4), and hardcoded object names
-    String appName = 'test'         //'Components'
+    String appName = env.fapp ?: 'test'
     String qrypName = appName
     String idxpName = appName
 //    String furl = 'http://newmac:8764'
@@ -44,6 +45,7 @@ class FusionClientTest extends Specification {
 
         then:
         apiInfo instanceof Map
+        apiInfo.status.fusion.ping==true            // todo -- is this version specific? is there a more general status check to use instead?
         client.majorVersion >= 4
     }
 
@@ -341,7 +343,7 @@ class FusionClientTest extends Specification {
 
         then:
         allColls instanceof List
-        allColls.size() > 50         // todo -- improve test logic & abstraction
+        allColls.size() > 5         // todo -- improve test logic & abstraction
 
         filteredColls instanceof List<Map<String, Object>>
         filteredColls.size() < allColls.size()
