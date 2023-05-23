@@ -22,12 +22,12 @@ class FusionClientTest extends Specification {
     // NOTE: this breaks best practice for unit tests, but we are pulling connection info from the environment, so set these values in the system env variables when running these tests, otherwise expect them to fail...
     Map<String, String> env = System.getenv()
 //    String furl = env.furl ?: 'http://localhost:8764'
-//    String furl = env.furl ?: 'http://foundry.lucidworksproserve.com:6764'
-//    String fuser = env.fuser ?: 'admin'
-//    String fpass = env.fpass ?: 'password123'
-//    String qryp = env.qryp ?: 'Components_TYPEAHEAD_DW_QPL_v4'
-//    FusionClient client = new FusionClient(furl, fuser, fpass)
-    FusionClient client = new FusionClient()
+    String furl = env.furl ?: 'http://foundry.lucidworksproserve.com:6764'
+    String fuser = env.fuser ?: 'admin'
+    String fpass = env.fpass ?: 'password123'
+    String qryp = env.qryp ?: 'Components_TYPEAHEAD_DW_QPL_v4'
+    FusionClient client = new FusionClient(furl, fuser, fpass)
+//    FusionClient client = new FusionClient()
 
     // todo -- make this more portable, currently limited to 'my' config, with a test app (F4), and hardcoded object names
     String appName = env.fapp ?: 'test'
