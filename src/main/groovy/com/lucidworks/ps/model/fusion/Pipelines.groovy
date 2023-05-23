@@ -11,7 +11,7 @@ import org.apache.log4j.Logger
  * We may convert to more explicit composite objects as necessary
  */
 class Pipelines extends BaseObject {
-    static Logger log = Logger.getLogger(this.class.name);
+    static Logger log2 = Logger.getLogger(this.class.name);
     /** map of the source objects (pipeline jsonobjects), converted from list to map (id as key)  */
     Map<String, List<PipelineStages>> pipelines = [:]
 
@@ -40,7 +40,7 @@ class Pipelines extends BaseObject {
                             Javascript js = new Javascript(label, script, this.itemType)
                             jsStages << js
                         } else {
-                            log.warn "Problem finding script in JS stage ($label)...?"
+                            log2.warn "Problem finding script in JS stage ($label)...?"
                         }
                     }
                 }
@@ -48,19 +48,19 @@ class Pipelines extends BaseObject {
                 if (jsStages) {
                     javascriptStages[pipelineID] = jsStages
                 } else {
-                    log.debug "no js stages in $pipelineID"
+                    log2.debug "no js stages in $pipelineID"
                 }
-                log.debug "jsStages: ${jsStages.size()}"
+                log2.debug "jsStages: ${jsStages.size()}"
             } else {
-                log.warn "!!!!!!!!!!!! No stages in pipeline ($pipelineID): $pipelineJsonMap"
+                log2.warn "!!!!!!!!!!!! No stages in pipeline ($pipelineID): $pipelineJsonMap"
             }
         }
-        log.debug "Javascript stages: $javascriptStages"
+        log2.debug "Javascript stages: $javascriptStages"
     }
 
     @Override
     def export(File exportFolder) {
-        log.info "export Pipelines (count:${this.srcJsonList.size()}) to folder: ${exportFolder.absolutePath}"
+        log2.info "export Pipelines (count:${this.srcJsonList.size()}) to folder: ${exportFolder.absolutePath}"
         List<File> exportedFiles = []
         srcJsonList.each { Map pipeline ->
             String id = pipeline.id
@@ -72,7 +72,7 @@ class Pipelines extends BaseObject {
             String prettyJson = JsonOutput.prettyPrint(jsonText)
             outfile.text = prettyJson
             exportedFiles << outfile
-            log.info "\t\texported index pipeline with id ($id) to file: ${outfile.absolutePath}"
+            log2.info "\t\texported index pipeline with id ($id) to file: ${outfile.absolutePath}"
 
             def jsStages = pipeline.stages.findAll { ((String) it.type).containsIgnoreCase('javascript') }
             jsStages.each {
@@ -81,13 +81,13 @@ class Pipelines extends BaseObject {
                 String jsname = "${outname}.javascript.${id}.js"
                 File jsOutfile = new File(exportFolder, jsname)
                 jsOutfile.text = it.script
-                log.info "\t\twrote javascript (helper) file: ${jsOutfile.absolutePath}"
+                log2.info "\t\twrote javascript (helper) file: ${jsOutfile.absolutePath}"
             }
 
             File outStageFolder = new File(exportFolder, 'stages')
             def rc = Helper.getOrMakeDirectory(outStageFolder)
             pipeline.stages.each { def stage ->
-                log.debug "stage to export: ${stage.type}"
+                log2.debug "stage to export: ${stage.type}"
                 File f = new File(outStageFolder, "${stage.type}.${outname}.${stage.id}.json")
                 String jsonTextStage = jsonDefaultOutput.toJson(stage)
                 String prettyJsonStage = JsonOutput.prettyPrint(jsonTextStage)

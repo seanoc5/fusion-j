@@ -10,7 +10,8 @@ import org.apache.log4j.Logger
  * Base object to facilitate exporting to various destinations (filesystem, fusion instance,...)
  */
 public class BaseObject {
-    static final Logger log = Logger.getLogger(this.class.name);
+    static Logger log = Logger.getLogger(this.class.name);
+//    static final Logger log = Logger.getLogger(this.class.name);
     static def jsonDefaultOutput = new JsonGenerator.Options().dateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").build()
 
     List<Map> srcJsonList = []
@@ -64,9 +65,9 @@ public class BaseObject {
     }
 
 
-    String export(Map rules = [set:[], remove:[/created|lastUpdated/]]) {
+    String export(Map rules = [set: [], remove: [/created|lastUpdated/]]) {
         String s = null
-        if(srcItems){
+        if (srcItems) {
             log.debug "export srcItems to String (override for non-strings and anything else that did not come from a JsonSluper..."
             String json = jsonDefaultOutput.toJson(srcItems)
             String pretty = JsonOutput.prettyPrint(json)
@@ -88,7 +89,7 @@ public class BaseObject {
                 String name = getItemName(it)
                 name = Helper.sanitizeFilename(name)
 //                if(name.endsWith()
-                outFile = new File(exportFolder, name+'.json')
+                outFile = new File(exportFolder, name + '.json')
                 String json = toJson(it)
                 log.debug "$itemType::$name) ${it.size()}"
                 outFile.text = json
