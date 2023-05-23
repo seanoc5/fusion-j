@@ -17,7 +17,7 @@ import java.util.zip.ZipFile
  * We may convert to more explicit composite objects as necessary
  */
 class Application extends BaseObject {
-    static final Logger log = Logger.getLogger(this.class.name);
+    static Logger log = Logger.getLogger(this.class.name);
     public static final List<String> DEFAULT_APP_OBJECTS = "configsets collections dataSources indexPipelines indexProfiles queryPipelines queryProfiles parsers blobs appkitApps features objectGroups links sparkJobs jobs".split(' ')
 
     /** Object holding source for loading this app (file, fusion-j client, git repo... */
@@ -184,7 +184,7 @@ class Application extends BaseObject {
         return null
     }
 
-    def transform(def thingsToTransform, def transformRules){
+    def transform(def thingsToTransform, def transformRules) {
         Map<String, Object> resultsMap = [:]
         thingsToTransform.each { thingType ->
             String msg = "Transform fusion app thing: $thingType"
@@ -356,7 +356,7 @@ class Application extends BaseObject {
                 log.debug "configsets: $configsets"
             }
             log.info "\t\tConfig sets (${configsets?.toString()}) and parsed Map keyset: (${exportedObjectsSourceMap?.keySet()})"
-        } catch(ZipException ze) {
+        } catch (ZipException ze) {
             log.warn "Zip file error: $ze"
         }
     }

@@ -48,8 +48,8 @@ class Collections extends BaseObject {
 
         complexity = assessCollectionName(name, complexity, assessment)
 
-        int commitWithin = collection.commitWithin
-        if (commitWithin < 1000) {
+        Integer commitWithin = collection.commitWithin
+        if (commitWithin && commitWithin < 1000) {
             Map item = [:]
             if (commitWithin < 500) {
                 item.complexity = 5
