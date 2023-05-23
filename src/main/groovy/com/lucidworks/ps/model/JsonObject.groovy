@@ -568,7 +568,7 @@ class JsonObject {
      * @deprecated use flattenWithLeafObject instead
      */
     static List<String> flatten(def object, int level = 0, String separator = '/') {
-        log.warn "Use flattenWithLeafObject in place of this outdated 'flatten' call..."
+        log.warn "JS) Use flattenWithLeafObject in place of this outdated 'flatten' call..."
         List<String> entries = []
         log.debug "$level) flatten object: $object... with separator:$separator"
         if (object instanceof Map) {
