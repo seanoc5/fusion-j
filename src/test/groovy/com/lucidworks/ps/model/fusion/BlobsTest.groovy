@@ -22,7 +22,7 @@ class BlobsTest extends Specification {
         Blobs blobs = new Blobs('spock-test', testFolder)
 
         then:
-        blobs.srcItems.size() == 18
+        blobs.srcItems.size() == 15
     }
 
     def "Export"() {
@@ -35,7 +35,7 @@ class BlobsTest extends Specification {
         def rc = blobs.export(tempFolder.toFile())
 
         then:
-        blobs.srcItems.size() == 18
+        blobs.srcItems.size() == 15
 
     }
 
