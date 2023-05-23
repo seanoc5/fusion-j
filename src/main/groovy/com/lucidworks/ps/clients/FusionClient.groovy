@@ -44,8 +44,9 @@ import java.util.regex.Pattern
  * todo consider httpclient cache for peformance and multithreading
  * todo add parallelism and scaling for bulk data transfers
  */
+
 class FusionClient {
-    protected static Logger log = Logger.getLogger(this.class.name)
+    static Logger log = Logger.getLogger(this.class.name)
     Application application
     String user = null
     String password = null
