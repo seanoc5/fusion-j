@@ -20,28 +20,30 @@ class IndexPipelinesTest extends Specification {
         then:
         jsonObject.size() == 1
         jsonObject instanceof List<Map>
-        pipeline1.keySet().toList() == ['id', 'stages', 'properties']
+        pipeline1.keySet().toList() == ['id', 'stages', 'properties', 'updates']
         stages.size() == 6
 
     }
 
     def "should load an example indexpipeline from file - basic test"() {
         given:
-        String singlePipelineId = 'testIdxPipeline'
+        String stageId = 'tip1'
+        String pipelineId = 'testIdxPipeline'
+        String singlePipelineKey = "${pipelineId}-$stageId"
 
         when:
         IndexPipelines idxpWrapper = new IndexPipelines('unit test', jsonObject)
         Set keysStages = idxpWrapper.pipelineStagesMap.keySet()
-        def stages = idxpWrapper.pipelineStagesMap[singlePipelineId]
-        def javascriptStages = idxpWrapper.javascriptStages[singlePipelineId]
+        def stages = idxpWrapper.pipelineStagesMap[singlePipelineKey]
+        def javascriptStages = idxpWrapper.javascriptStages[pipelineId]
 
 
         then:
         idxpWrapper instanceof IndexPipelines
         idxpWrapper.itemType == 'IndexPipelines'
-        idxpWrapper.pipelineStagesMap.keySet().size() == 1
+        idxpWrapper.pipelineStagesMap.keySet().size() == 6
         stages.size() == 6
-        stages[0].id == 'tip1'
+        stages['id'] == 'tip1'
 
         idxpWrapper.javascriptStages.keySet().size() == 1
         javascriptStages.size() == 2
